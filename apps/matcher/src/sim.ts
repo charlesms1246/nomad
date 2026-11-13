@@ -54,7 +54,7 @@ const sym = (t: TokenInfo) => t.symbol;
 /** Signature-free signer for sim (the LedgerChain doesn't check signatures; nonces are unique). */
 export const simSigner =
   (account: string, rng: () => number) =>
-  (a: { diff: Record<string, string>; deadline: Date; salt: string; verifierId: string; memo?: string }): MultiPayload => ({
+  (a: { diff: Record<string, string>; deadline: Date; salt: string; verifierId: string; memo?: string; nonce?: Uint8Array }): MultiPayload => ({
     standard: "nep413",
     payload: {
       message: JSON.stringify({
@@ -63,7 +63,7 @@ export const simSigner =
         deadline: a.deadline.toISOString(),
         intents: [{ intent: "token_diff", diff: a.diff, ...(a.memo ? { memo: a.memo } : {}) }],
       }),
-      nonce: Buffer.from(Array.from({ length: 32 }, () => Math.floor(rng() * 256))).toString("base64"),
+      nonce: Buffer.from(a.nonce ?? Array.from({ length: 32 }, () => Math.floor(rng() * 256))).toString("base64"),
       recipient: a.verifierId,
     },
     public_key: "ed25519:sim",

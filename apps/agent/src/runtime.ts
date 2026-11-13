@@ -1,6 +1,7 @@
 // Agent runtime: holds a strategy, keeps offers live, and answers ring proposals.
 // Transport-agnostic: the same class runs in-process (sim) and behind the WebSocket bus (live).
 
+import { buildNonce } from "@nomad/intents";
 import { legCheck } from "./legCheck.js";
 import { runStrategy, type StrategyName, type TokenInfo } from "./strategies.js";
 import { legDiff, type Offer, type RingProposal, type TokenId, type MultiPayload } from "./protocol.js";
@@ -12,6 +13,8 @@ export type LegSigner = (args: {
   salt: string;
   verifierId: string;
   memo?: string;
+  /** 32-byte nonce to sign with (shared by every leg of one offer, see onProposal). */
+  nonce?: Uint8Array;
 }) => MultiPayload;
 
 /** Reads this agent's verifier balances. Live: mt_balance_of. Sim: verifier model. */
@@ -41,6 +44,12 @@ export class AgentRuntime {
   pending = new Map<string, { token: TokenId; amt: bigint; expiresAtMs: number }>();
   unmatchedRounds = 0;
   private seq = 0;
+  /**
+   * One Verifier nonce per offer (and salt). Every leg signed against the same offer reuses it,
+   * so at most one of those legs can ever execute: competing matchers can't overfill an offer,
+   * whatever the agent's balance. Rotated after a settlement.
+   */
+  private offerNonce = new Map<string, Uint8Array>();
 
   constructor(
     public cfg: AgentConfig,
@@ -105,12 +114,20 @@ export class AgentRuntime {
       expectedVerifier: this.cfg.verifierId,
     });
     if (!r.ok) return { type: "DECLINE", ringId: p.ringId, agent: this.id, reason: r.reason };
+    const offer = this.offers.find((o) => o.id === r.leg.offerId)!;
+    const nk = `${offer.id}|${p.salt}`;
+    let nonce = this.offerNonce.get(nk);
+    if (!nonce) {
+      nonce = buildNonce(p.salt, new Date(offer.expiresAtMs));
+      this.offerNonce.set(nk, nonce);
+    }
     const signed = this.sign({
       diff: legDiff(r.leg),
       deadline: new Date(p.deadline),
       salt: p.salt,
       verifierId: p.verifierId,
       memo: `nomad:${p.ringId.slice(0, 16)}`,
+      nonce,
     });
     this.pending.set(p.ringId, { token: r.leg.give, amt: r.leg.giveAmt, expiresAtMs: Date.parse(p.deadline) });
     return { type: "SIGNED", ringId: p.ringId, agent: this.id, signed };
@@ -119,6 +136,8 @@ export class AgentRuntime {
   onSettled(ringId: string, offerId?: string, gave?: bigint) {
     const p = this.pending.get(ringId);
     this.pending.delete(ringId);
+    // the offer's nonce is now spent on chain: later legs of this offer need a fresh one
+    if (offerId) for (const k of [...this.offerNonce.keys()]) if (k.startsWith(`${offerId}|`)) this.offerNonce.delete(k);
     // Shrink the offer that was used; drop it when exhausted.
     if (offerId && gave !== undefined) {
       this.offers = this.offers

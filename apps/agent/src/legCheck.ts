@@ -56,6 +56,8 @@ export function legCheck(i: LegCheckInput): LegCheckResult {
   if (deadlineMs <= i.nowMs) return no("deadline in the past");
   if (deadlineMs > i.nowMs + MAX_DEADLINE_AHEAD_MS) return no("deadline too far ahead");
   if (p.proposalExpiresAtMs <= i.nowMs) return no("proposal expired");
+  // the leg's nonce expires with the offer, and the Verifier needs message deadline <= nonce deadline
+  if (deadlineMs > offer.expiresAtMs) return no("deadline after offer expiry");
 
   // 4. balance (over-commit allowed up to 2x; overlapping rings fail atomically)
   const bal = i.balances[leg.give] ?? 0n;

@@ -70,4 +70,5 @@ export const liveSigner =
       deadline: a.deadline,
       diff: a.diff,
       memo: a.memo,
+      nonce: a.nonce,
     }) as unknown as MultiPayload;

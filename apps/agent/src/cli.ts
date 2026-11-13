@@ -44,7 +44,7 @@ async function main() {
           ? llmMarginAdvisor({ apiKey: env("NEARAI_API_KEY"), plan: env("PLAN", "I need the target token for inference; I can wait for a fair rate.") })
           : undefined,
     },
-    (a) => signTokenDiff({ signerId: id, secretKey: ik.private_key, verifierId: a.verifierId, salt: a.salt, deadline: a.deadline, diff: a.diff, memo: a.memo }) as never,
+    (a) => signTokenDiff({ signerId: id, secretKey: ik.private_key, verifierId: a.verifierId, salt: a.salt, deadline: a.deadline, diff: a.diff, memo: a.memo, nonce: a.nonce }) as never,
     async (ts) => Object.fromEntries((await intents.mtBatchBalanceOf(id, ts)).map((v, i) => [ts[i]!, v])),
     rngFrom(Number(process.env.SEED ?? 1)),
   );

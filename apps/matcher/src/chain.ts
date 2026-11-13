@@ -38,4 +38,5 @@ export type DiffSigner = (args: {
   salt: string;
   verifierId: string;
   memo?: string;
+  nonce?: Uint8Array;
 }) => MultiPayload;
