@@ -59,6 +59,8 @@ export interface Ring {
   k: number; // number of agents (2..5)
   legs: Leg[]; // cyclic: legs[i].get == legs[i+1].give
   matcher: AccountId;
+  /** Signer of the execute_intents tx when it isn't the matcher (delegated Verifier key, 0-block path). */
+  txSigner?: AccountId;
   matcherLeg: { token: TokenId; amt: Amount }; // matcher's positive-only diff
   signedBy: AccountId[]; // agents whose leg is signed so far (UI lights these legs)
   surplusBps: number; // (S - 1) * 1e4, S = 1 / Π ρ

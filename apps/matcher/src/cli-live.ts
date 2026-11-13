@@ -145,10 +145,12 @@ async function main() {
   const relayerMatcherId = cfg.relayerMatcherId ?? `intents-matcher-1.${cfg.parent}`;
   const SUBMIT_AS_VERIFIER = env("SUBMIT_AS", "") === "verifier";
   const prod = mk(prodId, SUBMIT_AS_VERIFIER ? relayerChain() : chainFor(prodId));
+  if (SUBMIT_AS_VERIFIER) prod.opts.txSigner = cfg.verifierId;
   const racers: { m: Matcher; label: string; txSigner: string }[] = [{ m: prod, label: prodId, txSigner: SUBMIT_AS_VERIFIER ? cfg.verifierId : prodId }];
   if (RACE) racers.push({ m: mk(ctrlId), label: ctrlId, txSigner: ctrlId });
   if (RACE_N >= 3) racers.push({ m: mk(relayerMatcherId, relayerChain()), label: `${relayerMatcherId} (signs as ${cfg.verifierId})`, txSigner: cfg.verifierId });
   for (const { m, label, txSigner } of racers) {
+    if (txSigner !== m.opts.account) m.opts.txSigner = txSigner;
     const c = await check({ account: txSigner, target: cfg.verifierId }, { network: "testnet" });
     m.opts.shard = c.accountShard;
     race.matchers.push({ account: label, shard: c.accountShard, colocated: c.colocated, wins: 0, blocksToExecHist: {} });
@@ -173,9 +175,13 @@ async function main() {
         agents: () => agents.values(),
         rings: () => rings,
         swarm: () => {
+          // live ring-length histogram; the clearing-rate curve comes from the last `make sim` sweep (labelled sim)
           const settled = rings.filter((r) => r.status === "settled");
           const hist: Record<string, number> = {};
           for (const r of settled) hist[String(r.k)] = (hist[String(r.k)] ?? 0) + 1;
+          const simFile = path.join(outDir, "sim.json");
+          const sim = fs.existsSync(simFile) ? JSON.parse(fs.readFileSync(simFile, "utf8")).swarm : null;
+          if (sim?.points?.length) return { ...sim, source: "sim", ringLengthHist: Object.keys(hist).length ? hist : sim.ringLengthHist };
           return { source: "live", seed: SEED, points: [], ringLengthHist: hist };
         },
         race: () => (RACE ? race : null),
@@ -189,7 +195,8 @@ async function main() {
     try {
       const one = 10n ** BigInt(w.decimals);
       const b = await baseline({ give: w.id, giveAmt: one, get: u.id, getAmt: BigInt(Math.round(w.priceUsd * 10 ** u.decimals)) }, { tokens: tokenMap });
-      lastBaseline = { pair: "wNEAR->USDC", bps: -Math.round(b.savingsBps * 10) / 10, quotedAtMs: Date.parse(b.timestamp) };
+      // spread of the 1Click quote below mid, as a positive number of bps (the UI renders it as "−X bps")
+      lastBaseline = { pair: "wNEAR->USDC", bps: Math.round(b.savingsBps * 10) / 10, quotedAtMs: Date.parse(b.timestamp) };
       log("1Click baseline vs mid", lastBaseline);
     } catch (e) {
       log("baseline failed", { error: String(e) });

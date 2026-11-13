@@ -14,6 +14,8 @@ export interface AgentLink {
 
 export interface MatcherOpts {
   account: string;
+  /** Account that signs the execute_intents tx, when not the matcher itself (delegated Verifier key). */
+  txSigner?: string;
   shard: number | null;
   maxLen?: number;
   phi?: number;
@@ -93,6 +95,7 @@ export class Matcher {
       k: r.k,
       legs: r.legs.map((l) => ({ ...l, giveAmt: l.giveAmt.toString(), getAmt: l.getAmt.toString() })),
       matcher: this.opts.account,
+      ...(this.opts.txSigner ? { txSigner: this.opts.txSigner } : {}),
       matcherLeg: { token: r.matcherLeg.token, amt: r.matcherLeg.amt.toString() },
       signedBy: [],
       surplusBps: Math.round((r.surplusFactor - 1) * 1e4 * 100) / 100,
