@@ -33,6 +33,9 @@ export interface SimOpts {
   maxLen?: number;
   chain?: Chain;
   onRing?: (r: UiRing) => void;
+  onAgents?: (agents: AgentRuntime[]) => void;
+  /** Wall-clock pause per round (SERVE mode, so the UI can animate). */
+  roundDelayMs?: number;
 }
 
 export interface SimResult {
@@ -102,6 +105,7 @@ export async function runSim(o: SimOpts): Promise<SimResult> {
     );
   }
 
+  o.onAgents?.([...agents.values()]);
   const rings: UiRing[] = [];
   const matcher = new Matcher(
     {
@@ -112,6 +116,7 @@ export async function runSim(o: SimOpts): Promise<SimResult> {
       priceUsd: Object.fromEntries(tokens.map((t) => [t.id, t.priceUsd])),
       decimals: Object.fromEntries(tokens.map((t) => [t.id, t.decimals])),
       onRing: o.onRing,
+      maxRingsPerRound: 1000,
     },
     chain,
     simSigner("intents-matcher.nomadswarm.testnet", rng),
@@ -172,6 +177,7 @@ export async function runSim(o: SimOpts): Promise<SimResult> {
     }
     for (const of of book) if (!filled.has(of.id)) age.set(of.id, (age.get(of.id) ?? 0) + 1);
     now += 2_000;
+    if (o.roundDelayMs) await new Promise((res) => setTimeout(res, o.roundDelayMs));
   }
 
   const settled = rings.filter((r) => r.status === "settled");
