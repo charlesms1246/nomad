@@ -24,6 +24,8 @@ async function main() {
 
   // 1. matcher accounts: production on the Verifier's shard (colo place), control elsewhere
   let prodMatcher = cfg.matcherId;
+  // Reuse our existing production matcher; `colo place` only for a fresh setup (it skips taken names).
+  if (!prodMatcher && hasCredentials(`intents-matcher.${parent}`)) prodMatcher = `intents-matcher.${parent}`;
   if (!prodMatcher) {
     prodMatcher = (await place(cfg.verifierId, { parent, hint: "intents-matcher", network: "testnet" })).accountId;
   }
@@ -68,7 +70,7 @@ async function main() {
     }
 
     // 3. agents: a board function-call key that can only post/cancel offers (cannot move funds)
-    if (!isMatcher && cfg.boardId) {
+    if (!isMatcher && cfg.boardId && process.env.SKIP_BOARD_KEYS !== "1") {
       const bkFile = path.join(kdir, `${id}.board.json`);
       if (!fs.existsSync(bkFile)) {
         const kp = randomKeyPair();

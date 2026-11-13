@@ -22,7 +22,7 @@ SWEEP ?= 1
 PORT ?= 8787
 TSX := pnpm exec tsx
 
-.PHONY: help install build test test-ts test-rust sim sim-serve dry-run ui live race fixtures kill-tests accounts fund colo-check clean
+.PHONY: help install build test test-ts test-rust sim sim-serve dry-run ui live race fixtures kill-tests accounts fund fixture-accounts colo-check clean
 
 help:
 	@sed -n '1,14p' Makefile
@@ -68,8 +68,12 @@ live: build
 race: build
 	cd apps/matcher && RACE=1 PORT=$(PORT) $(TSX) src/cli-live.ts
 
+# Fixture agents fx01..fx12 are separate from the live agents, so live trading never drains them.
+fixture-accounts: build
+	cd apps/matcher && AGENT_PREFIX=fx AGENT_NEAR=0.15 SKIP_BOARD_KEYS=1 $(TSX) src/cli-accounts.ts && AGENT_PREFIX=fx SKIP_BOARD=1 FUND_USD=0.75 $(TSX) src/cli-fund.ts
+
 fixtures: build
-	cd apps/matcher && $(TSX) src/cli-fixtures.ts $(CURDIR)/fixtures/rings
+	cd apps/matcher && AGENT_PREFIX=fx $(TSX) src/cli-fixtures.ts $(CURDIR)/fixtures/rings
 
 kill-tests: build
 	for k in scripts/k*.ts; do echo "== $$k"; $(TSX) $$k || exit 1; done

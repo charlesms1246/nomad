@@ -3,14 +3,14 @@
   "note": "Signed NEP-413 token_diff legs of a demo ring on our testnet Verifier. Signatures only, no keys. Replay with `make dry-run`.",
   "network": "testnet",
   "verifierId": "intents.nomadswarm.testnet",
-  "createdAt": "2026-11-13T22:14:45.615Z",
+  "createdAt": "2026-11-13T22:39:30.210Z",
   "deadline": "2026-12-31T00:00:00.000Z",
   "feePips": 1,
   "k": 5,
   "surplusFactor": 1.0515303325940444,
   "legs": [
     {
-      "agent": "a08.nomadswarm.testnet",
+      "agent": "fx08.nomadswarm.testnet",
       "offerId": "fx-ring-5-0",
       "give": "nep141:btc.nomadswarm.testnet",
       "giveAmt": "362",
@@ -18,7 +18,7 @@
       "getAmt": "248996"
     },
     {
-      "agent": "a09.nomadswarm.testnet",
+      "agent": "fx09.nomadswarm.testnet",
       "offerId": "fx-ring-5-1",
       "give": "nep141:usdt.nomadswarm.testnet",
       "giveAmt": "248997",
@@ -26,7 +26,7 @@
       "getAmt": "248410"
     },
     {
-      "agent": "a10.nomadswarm.testnet",
+      "agent": "fx10.nomadswarm.testnet",
       "offerId": "fx-ring-5-2",
       "give": "nep141:usdc.nomadswarm.testnet",
       "giveAmt": "248411",
@@ -34,7 +34,7 @@
       "getAmt": "69998926732617087200993"
     },
     {
-      "agent": "a11.nomadswarm.testnet",
+      "agent": "fx11.nomadswarm.testnet",
       "offerId": "fx-ring-5-3",
       "give": "nep141:wnear.nomadswarm.testnet",
       "giveAmt": "69998996731613818814812",
@@ -42,7 +42,7 @@
       "getAmt": "25887"
     },
     {
-      "agent": "a12.nomadswarm.testnet",
+      "agent": "fx12.nomadswarm.testnet",
       "offerId": "fx-ring-5-4",
       "give": "nep141:zec.nomadswarm.testnet",
       "giveAmt": "25888",
@@ -58,62 +58,62 @@
     {
       "standard": "nep413",
       "payload": {
-        "message": "{\"signer_id\":\"a08.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:btc.nomadswarm.testnet\":\"-362\",\"nep141:usdt.nomadswarm.testnet\":\"248996\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
-        "nonce": "Vij2xgB8oan5AABOipAt9hgI4Mqyjn3AsmZrvRrh7jo=",
+        "message": "{\"signer_id\":\"fx08.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:btc.nomadswarm.testnet\":\"-362\",\"nep141:usdt.nomadswarm.testnet\":\"248996\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
+        "nonce": "Vij2xgBnKGXBAABOipAt9hiJGn7mptw55tMLopF3TiQ=",
         "recipient": "intents.nomadswarm.testnet"
       },
-      "public_key": "ed25519:CswhBdLnHsqMDnWBgGfJbyUdfZTvTAmDUJs19b8ebTAs",
-      "signature": "ed25519:4PWpxgnSqR9itxsk7Mf6HzGd3eM9cmzY12sJ7sa73YE37jnp3MQv1HHHRFQBJG467Sjcsgqybckb42JJZXsJhEmr"
+      "public_key": "ed25519:2UyawstnbYxshGf2NRQyc4m6kJSQiHDux5wLa2p9KSGv",
+      "signature": "ed25519:2r1Gr52RzNqq1n51TCFdWuGp23fhWiXoFWZG4AHTbTWc4gNQm3ckz4GoGapNTTR6B9t2QWXhDWmD8ShR2B19VMwN"
     },
     {
       "standard": "nep413",
       "payload": {
-        "message": "{\"signer_id\":\"a09.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:usdt.nomadswarm.testnet\":\"-248997\",\"nep141:usdc.nomadswarm.testnet\":\"248410\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
-        "nonce": "Vij2xgB8oan5AABOipAt9hi7DCgVVCbR4gdk73y5KxI=",
+        "message": "{\"signer_id\":\"fx09.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:usdt.nomadswarm.testnet\":\"-248997\",\"nep141:usdc.nomadswarm.testnet\":\"248410\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
+        "nonce": "Vij2xgBnKGXBAABOipAt9hjX0zT+3SPMdGdG41Gq9Eg=",
         "recipient": "intents.nomadswarm.testnet"
       },
-      "public_key": "ed25519:JCKiZnZwgB5wmtb7mXUQhjt9KM4JVh8Cgn1onXeKvUdK",
-      "signature": "ed25519:2XT8ZmxR9Ju6SMkgtV3QnUyorattnoC9LAfKdm5ZxXzHucWeM15yqxwwYeNpDZyPTdLKVKeZsZHYyapUipTuw8Hz"
+      "public_key": "ed25519:9iDs9i9n6dJmbCmfc8dDirr6ZjQsZDTAUF93QZYTWdmB",
+      "signature": "ed25519:xemTVsvtSvc3VmD1z8EGLoLb2HLxCiffmh5m2pUJis5xmfEo78Kdtfv2aWubWc1exrvWM6NB6WaJFLCLhc1fMuV"
     },
     {
       "standard": "nep413",
       "payload": {
-        "message": "{\"signer_id\":\"a10.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:usdc.nomadswarm.testnet\":\"-248411\",\"nep141:wnear.nomadswarm.testnet\":\"69998926732617087200993\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
-        "nonce": "Vij2xgB8oan5AABOipAt9hhAypEOp4VDxpZsocQ6QLc=",
+        "message": "{\"signer_id\":\"fx10.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:usdc.nomadswarm.testnet\":\"-248411\",\"nep141:wnear.nomadswarm.testnet\":\"69998926732617087200993\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
+        "nonce": "Vij2xgBnKGXBAABOipAt9hjEEUak7Eo44ae5QgOCEsQ=",
         "recipient": "intents.nomadswarm.testnet"
       },
-      "public_key": "ed25519:5yZuJYgQvYxMX2DKuXNGy5eCuzJ9MYeNzXdS1Doxq2MR",
-      "signature": "ed25519:uY9stntf4o3YzHMdsnvH9SK4jdiBRUg9EPrZMimjtZaau6udGUQRsHekwJm5rutsandAg24FV7U9bHXNw6GZPbq"
+      "public_key": "ed25519:CqUtdQtC2ygGTi7k1Fr1q2GcYj6M4igBUa8LJAECvG9m",
+      "signature": "ed25519:2z2pB8WDpGBqg5nMvVkT8AwcL6B1EQsTUZkeHwUFEa6gDpeAuDLh1hnaqmSwd92eTGJAM1HysA9gNzJRYg1SK8wj"
     },
     {
       "standard": "nep413",
       "payload": {
-        "message": "{\"signer_id\":\"a11.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:wnear.nomadswarm.testnet\":\"-69998996731613818814812\",\"nep141:zec.nomadswarm.testnet\":\"25887\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
-        "nonce": "Vij2xgB8oan5AABOipAt9hj/DV0lLwGsdk2UBUfumi0=",
+        "message": "{\"signer_id\":\"fx11.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:wnear.nomadswarm.testnet\":\"-69998996731613818814812\",\"nep141:zec.nomadswarm.testnet\":\"25887\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
+        "nonce": "Vij2xgBnKGXBAABOipAt9hgwsUEx+GygYF3bH6Be9cc=",
         "recipient": "intents.nomadswarm.testnet"
       },
-      "public_key": "ed25519:C7vjsJ6e1PjxHDAasoxtfNS6NnsWL4DQBzCshzvWMCUX",
-      "signature": "ed25519:sNsH8ghXunJ8KbB3gUQz19xAGiDDNRuKnN9GWqAp4ZRZNdiTM5oJRtzT4WVyQhgHgmexki3CRD1nRUJWKDdrZcy"
+      "public_key": "ed25519:J31sKNxnMrMFkK6RNTTZpiU3hKJbpbEe5zdaYP6Umchc",
+      "signature": "ed25519:2SyAVdpFjry9ggKdjjXnT3FYr23SZq6HjfMarWa53izFnsUPfFkvQcdfiQpU5y2UdkLtV2g8BYM24iQSpHWVe6AY"
     },
     {
       "standard": "nep413",
       "payload": {
-        "message": "{\"signer_id\":\"a12.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:zec.nomadswarm.testnet\":\"-25888\",\"nep141:btc.nomadswarm.testnet\":\"358\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
-        "nonce": "Vij2xgB8oan5AABOipAt9hg09o2Rddc+drCu3ck9o04=",
+        "message": "{\"signer_id\":\"fx12.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:zec.nomadswarm.testnet\":\"-25888\",\"nep141:btc.nomadswarm.testnet\":\"358\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
+        "nonce": "Vij2xgBnKGXBAABOipAt9hhZ+ZYdT8kk7hokIOIFx1Q=",
         "recipient": "intents.nomadswarm.testnet"
       },
-      "public_key": "ed25519:9sxeUS2kMntxc4brFF7qLo8Mi3Cm4hf5LbFsGR8LA2iA",
-      "signature": "ed25519:2BKQvRAGT9VC7iQEt9gQdLbbjCz2bzdKm2yJxNqMs4csLYap63kf6A2eae3Q3pCHnVP82Y7FEK6AcRi562XpRFyw"
+      "public_key": "ed25519:7k2y3zjGaYcwuSdcqW2FREkSUN3ERPemSqEhfEjcpTNt",
+      "signature": "ed25519:66tQ9eAEjCwDvuY4aHShKFX6No52wjP5b8iarJpZkVgHpJGxENotHUmecxNN1o3ZSYpfm77sWWzEWNq51J15NVB8"
     },
     {
       "standard": "nep413",
       "payload": {
         "message": "{\"signer_id\":\"intents-matcher.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:btc.nomadswarm.testnet\":\"3\"},\"memo\":\"nomad:fixture:ring-5\"}]}",
-        "nonce": "Vij2xgB8oan5AABOipAt9hiSoKUD1qYE07WD5zB02w0=",
+        "nonce": "Vij2xgBnKGXBAABOipAt9hibrp+OzqE+CQRKBbr6NwA=",
         "recipient": "intents.nomadswarm.testnet"
       },
       "public_key": "ed25519:42RYSFSX89dCFG2cKWE2kRjHsJDNr3B87EoCAq1MrDaW",
-      "signature": "ed25519:3wrP3X4RCAkqCDLzLawi2HnTuyrHimFYXULWCWhA7bBfXjWDkeatQwUBFT9obktL5moE5WTfRwz1Pu1vsFc8DJ9h"
+      "signature": "ed25519:65gF4uZqEcjFxMCYMt8y8G5S9GA8b25mJWPDakvAGyavjpQhTh3VuekHcSFFADhVAinikEaLeDFKrjigXZo3jp5M"
     }
   ],
   "simulatedAtCreation": {

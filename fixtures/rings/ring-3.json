@@ -3,14 +3,14 @@
   "note": "Signed NEP-413 token_diff legs of a demo ring on our testnet Verifier. Signatures only, no keys. Replay with `make dry-run`.",
   "network": "testnet",
   "verifierId": "intents.nomadswarm.testnet",
-  "createdAt": "2026-11-13T22:14:43.165Z",
+  "createdAt": "2026-11-13T22:39:29.173Z",
   "deadline": "2026-12-31T00:00:00.000Z",
   "feePips": 1,
   "k": 3,
   "surplusFactor": 1.0306069463623255,
   "legs": [
     {
-      "agent": "a01.nomadswarm.testnet",
+      "agent": "fx01.nomadswarm.testnet",
       "offerId": "fx-ring-3-0",
       "give": "nep141:zec.nomadswarm.testnet",
       "giveAmt": "26169",
@@ -18,7 +18,7 @@
       "getAmt": "249601"
     },
     {
-      "agent": "a02.nomadswarm.testnet",
+      "agent": "fx02.nomadswarm.testnet",
       "offerId": "fx-ring-3-1",
       "give": "nep141:usdc.nomadswarm.testnet",
       "giveAmt": "249602",
@@ -26,7 +26,7 @@
       "getAmt": "70334533982086921057068"
     },
     {
-      "agent": "a03.nomadswarm.testnet",
+      "agent": "fx03.nomadswarm.testnet",
       "offerId": "fx-ring-3-2",
       "give": "nep141:wnear.nomadswarm.testnet",
       "giveAmt": "70334604316691237748306",
@@ -42,42 +42,42 @@
     {
       "standard": "nep413",
       "payload": {
-        "message": "{\"signer_id\":\"a01.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:zec.nomadswarm.testnet\":\"-26169\",\"nep141:usdc.nomadswarm.testnet\":\"249601\"},\"memo\":\"nomad:fixture:ring-3\"}]}",
-        "nonce": "Vij2xgB8oan5AABOipAt9hgJ2Zf288zxyOeIkuwlNy8=",
+        "message": "{\"signer_id\":\"fx01.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:zec.nomadswarm.testnet\":\"-26169\",\"nep141:usdc.nomadswarm.testnet\":\"249601\"},\"memo\":\"nomad:fixture:ring-3\"}]}",
+        "nonce": "Vij2xgBnKGXBAABOipAt9hgepzo54Iwa5Bwz3YDQLog=",
         "recipient": "intents.nomadswarm.testnet"
       },
-      "public_key": "ed25519:AT2L3rBBTb95H4LahorDVQ2iHyuvJF3sLfGCPadVjTFp",
-      "signature": "ed25519:sr9k7j6DeF3cvgGsCopY3pH8XyDV8WxsNTak7Jaz5BRZGQKvfPKfYJgbk8QtATvKiX4rUHcMtF3fPmBDc4yMVSv"
+      "public_key": "ed25519:9trwmCHzsTfXRwQLyPiexoF4xtwZkVQNxCEFpMruXX83",
+      "signature": "ed25519:4798FQeYaTqnG4PGYtYADabVqoZzFfcWE7xrTPK13weho8hVmESBJJufbjAD6hqFgSRJhSi4Y12VZq1Y5TptFYQo"
     },
     {
       "standard": "nep413",
       "payload": {
-        "message": "{\"signer_id\":\"a02.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:usdc.nomadswarm.testnet\":\"-249602\",\"nep141:wnear.nomadswarm.testnet\":\"70334533982086921057068\"},\"memo\":\"nomad:fixture:ring-3\"}]}",
-        "nonce": "Vij2xgB8oan5AABOipAt9hjROqyQcEPtOJvsXOpa4TY=",
+        "message": "{\"signer_id\":\"fx02.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:usdc.nomadswarm.testnet\":\"-249602\",\"nep141:wnear.nomadswarm.testnet\":\"70334533982086921057068\"},\"memo\":\"nomad:fixture:ring-3\"}]}",
+        "nonce": "Vij2xgBnKGXBAABOipAt9hisRjqDk+M8tYxiGN5Tnxw=",
         "recipient": "intents.nomadswarm.testnet"
       },
-      "public_key": "ed25519:2bPBLXasMFu6PYb828ZhbWiRoi4Xjux2cqwtvFrZMg4z",
-      "signature": "ed25519:2aatzaKiHAntorcTPnKKoaTFeHyXbne2EWbFpyZPuDjQuKoP78yfFJaj26P98LxQW6g5yUBSfxCUoF3h6gFnmHAA"
+      "public_key": "ed25519:74abGHGJXSUDdnJbpBGYovhyLrvjKoubiCmBHPVjFDkU",
+      "signature": "ed25519:5AKqWyFC5RqG3XcjadWEMDSADaU8yPsmw2yMNgc4gksb7tEo8mZSdHo3UZYJZc7vtioU7HAenyLEgPDQp7J9p59m"
     },
     {
       "standard": "nep413",
       "payload": {
-        "message": "{\"signer_id\":\"a03.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:wnear.nomadswarm.testnet\":\"-70334604316691237748306\",\"nep141:zec.nomadswarm.testnet\":\"26011\"},\"memo\":\"nomad:fixture:ring-3\"}]}",
-        "nonce": "Vij2xgB8oan5AABOipAt9hi5n2O3LCfwdh+G4PJnoL0=",
+        "message": "{\"signer_id\":\"fx03.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:wnear.nomadswarm.testnet\":\"-70334604316691237748306\",\"nep141:zec.nomadswarm.testnet\":\"26011\"},\"memo\":\"nomad:fixture:ring-3\"}]}",
+        "nonce": "Vij2xgBnKGXBAABOipAt9hgYs9A1fg88BmvmTl3j0as=",
         "recipient": "intents.nomadswarm.testnet"
       },
-      "public_key": "ed25519:79SR7ADjCrvdfVBZHfrYhiumrweSy9NmskSwjDBuuUsg",
-      "signature": "ed25519:36R9UAcmvpxPZSwAwN69drh4yRfcfA54bKbWfCPbc7yoLf5JF5xZJTLkxuRkzCW34vrVHYqXD8R2SwaLVH2S8vB6"
+      "public_key": "ed25519:9Sv6sFMxFbHD8CL7uRxJnC6oJkpyU5SgUTtpAxsgDikM",
+      "signature": "ed25519:4WHFvbi98XGUSZdFVTkJ8rXzLjxqpahaKg4iMBrLaKMeAnYtqQFu4iWyb4Vvco5zEV4bt7jst5hgLPbMYr9gvJmr"
     },
     {
       "standard": "nep413",
       "payload": {
         "message": "{\"signer_id\":\"intents-matcher.nomadswarm.testnet\",\"deadline\":\"2026-12-31T00:00:00.000Z\",\"intents\":[{\"intent\":\"token_diff\",\"diff\":{\"nep141:zec.nomadswarm.testnet\":\"157\"},\"memo\":\"nomad:fixture:ring-3\"}]}",
-        "nonce": "Vij2xgB8oan5AABOipAt9hgWMKFbQQa9MQOmp902fjQ=",
+        "nonce": "Vij2xgBnKGXBAABOipAt9hg05tOkTQMxIToDSS2ncT4=",
         "recipient": "intents.nomadswarm.testnet"
       },
       "public_key": "ed25519:42RYSFSX89dCFG2cKWE2kRjHsJDNr3B87EoCAq1MrDaW",
-      "signature": "ed25519:2f21PxgJnfSM2AALC53AhvhEB1KbRW1n3uLfPW6gjgTuoyPkoYahAAzKYkbcTwqSEMHkUpJjDo87RCNDJo74ptok"
+      "signature": "ed25519:58ij92bjiPzwKnfEQD5615r3utFZTasjCxNaNMNfJQKKcYxyH4Se2dERVaugJsn3vG2KYBBLLXvmDgrfPQX8cE4T"
     }
   ],
   "simulatedAtCreation": {

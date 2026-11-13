@@ -18,7 +18,8 @@ async function main() {
     const plan = AGENT_PLAN[i]!;
     const t = cfg.tokens.find((x) => x.symbol === plan.hold)!;
     const price = SIM_TOKENS.find((s) => s.symbol === plan.hold)!.priceUsd;
-    const target = BigInt(Math.floor((plan.usd / price) * 10 ** Math.min(t.decimals, 15))) * 10n ** BigInt(Math.max(0, t.decimals - 15));
+    const usd = process.env.FUND_USD ? +process.env.FUND_USD : plan.usd;
+    const target = BigInt(Math.floor((usd / price) * 10 ** Math.min(t.decimals, 15))) * 10n ** BigInt(Math.max(0, t.decimals - 15));
     const have = await intents.mtBalanceOf(id, t.id);
     if (have < target / 2n) {
       const r = await intents.deposit(owner, t.contract, target - have, id);

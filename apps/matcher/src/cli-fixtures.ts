@@ -29,7 +29,7 @@ async function main() {
     "ring-4": ["ZEC", "USDT", "USDC", "wNEAR"],
     "ring-5": ["BTC", "USDT", "USDC", "wNEAR", "ZEC"],
   };
-  const agents = agentIds(12, cfg.parent);
+  const agents = agentIds(12, cfg.parent, process.env.AGENT_PREFIX ?? "fx");
   const matcher = cfg.matcherId ?? `intents-matcher.${cfg.parent}`;
   fs.mkdirSync(dir, { recursive: true });
   let start = 0;

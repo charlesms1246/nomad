@@ -42,8 +42,9 @@ export function loadConfig(): NomadConfig {
   };
 }
 
-export const agentIds = (n: number, parent: string) =>
-  Array.from({ length: n }, (_, i) => `a${String(i + 1).padStart(2, "0")}.${parent}`);
+/** Live agents are aNN; `make fixtures` uses its own fxNN agents so live trading never drains them. */
+export const agentIds = (n: number, parent: string, prefix = process.env.AGENT_PREFIX ?? "a") =>
+  Array.from({ length: n }, (_, i) => `${prefix}${String(i + 1).padStart(2, "0")}.${parent}`);
 
 export function readKey(accountId: string, kind: "intents" | "board") {
   const f = path.join(keysDir(), `${accountId}.${kind}.json`);
