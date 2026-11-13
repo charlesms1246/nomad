@@ -187,6 +187,7 @@ async function main() {
   setInterval(refreshBaseline, 10 * 60_000).unref();
 
   const posted = new Map<string, string>(); // local offer id -> board id
+  const postedMax = new Map<string, bigint>(); // board id -> giveMax on the board
   for (let round = 1; MAX_ROUNDS === 0 || round <= MAX_ROUNDS; round++) {
     const t0 = Date.now();
     // 1. agents refresh and post new offers to the board (function-call key, no deposit)
@@ -194,10 +195,13 @@ async function main() {
       try {
         const offers = await a.refresh(tokens, Date.now());
         for (const o of offers) {
-          if (posted.has(o.id) || [...posted.values()].includes(o.id)) continue;
+          const known = posted.has(o.id) || postedMax.has(o.id);
+          // re-post (replaces the board offer for this pair) when a settled ring shrank it
+          if (known && (postedMax.get(o.id) ?? o.giveMax) <= o.giveMax) continue;
           const bk = readKey(a.id, "board");
           const boardId = await board.postOffer({ signerId: a.id, secretKey: bk.secretKey }, o, a.cfg.ttlMs ?? 600_000);
           posted.set(o.id, boardId);
+          postedMax.set(boardId, o.giveMax);
           o.id = boardId; // the agent and the board now agree on the id
           log("offer", { agent: a.id, id: boardId, give: sym(tokens, o.give), want: sym(tokens, o.want), giveMax: o.giveMax.toString() });
         }
@@ -208,7 +212,11 @@ async function main() {
     // 2. matcher reads the public board (plus any bus agents' offers)
     let book: Offer[] = [];
     try {
-      book = [...(await board.offers()), ...wsLink.allOffers()];
+      // In-process agents' own offer state is authoritative (it shrinks as rings settle);
+      // other agents' offers come from the public board and the bus.
+      const local = new Map([...agents.values()].flatMap((a) => a.offers.map((o) => [o.id, o] as const)));
+      const fromBoard = (await board.offers()).filter((o) => !agents.has(o.agent) || local.has(o.id)).map((o) => local.get(o.id) ?? o);
+      book = [...fromBoard, ...wsLink.allOffers()];
     } catch (e) {
       log("board read failed", { error: String(e).slice(0, 200) });
     }
