@@ -35,7 +35,7 @@ export class Matcher {
   private seq = 0;
   constructor(
     public opts: MatcherOpts,
-    private chain: Chain,
+    readonly chain: Chain,
     private sign: DiffSigner,
     private agents: AgentLink,
   ) {}
