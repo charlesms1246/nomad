@@ -5,7 +5,12 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run"
@@ -13,7 +18,10 @@
   "dependencies": {
     "@nomad/agent": "workspace:*",
     "@nomad/ringfinder": "workspace:*",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "@nomad/intents": "workspace:*",
+    "@nomad/colo": "workspace:*",
+    "@nomad/oneclick": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
