@@ -53,6 +53,9 @@ importers:
       '@nomad/ringfinder':
         specifier: workspace:*
         version: link:../../packages/ringfinder
+      '@nomad/verifier-model':
+        specifier: workspace:*
+        version: link:../../packages/verifier-model
       ws:
         specifier: ^8.18.0
         version: 8.23.0

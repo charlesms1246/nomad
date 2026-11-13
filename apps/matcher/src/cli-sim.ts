@@ -17,14 +17,16 @@ const SEED = +env("SEED", "1");
 const ROUNDS = +env("ROUNDS", "30");
 const OUT = path.resolve(env("OUT_DIR", path.join(process.cwd(), "out")));
 const BASELINE = +env("BASELINE_BPS", String(DEFAULT_BASELINE_BPS));
+const BACKEND = env("SIM_BACKEND", "ledger") === "model" ? "model" : "ledger"; // SIM_BACKEND=model: verifier model, real signatures
 
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
-  const one = await runSim({ agents: AGENTS, tokens: TOKENS, seed: SEED, rounds: ROUNDS, baselineBps: BASELINE });
+  const t0 = Date.now();
+  const one = await runSim({ agents: AGENTS, tokens: TOKENS, seed: SEED, rounds: ROUNDS, baselineBps: BASELINE, backend: BACKEND });
   const p = one.point;
   const hist = Object.entries(one.ringLengthHist).map(([k, n]) => `k=${k}:${n}`).join(" ");
   console.log(
-    `sim agents=${AGENTS} tokens=${p.tokens} seed=${SEED} rounds=${ROUNDS}: settled ${p.ringsSettled} rings (${hist}), ` +
+    `sim backend=${BACKEND} (${Date.now() - t0} ms) agents=${AGENTS} tokens=${p.tokens} seed=${SEED} rounds=${ROUNDS}: settled ${p.ringsSettled} rings (${hist}), ` +
       `cleared ${(p.clearingRate * 100).toFixed(0)}% of offers by rings (${one.offersCleared}/${one.offersCleared + one.offersFallback}), ` +
       `${(p.fallbackRate * 100).toFixed(0)}% fell back to 1Click; ` +
       `agents' mean rate vs mid ${one.meanImprovementBps?.toFixed(1)} bps vs 1Click baseline -${BASELINE} bps ` +

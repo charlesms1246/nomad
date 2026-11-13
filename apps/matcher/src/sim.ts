@@ -5,6 +5,7 @@ import { AgentRuntime, rngFrom, type StrategyName, type TokenInfo, type MultiPay
 import { Matcher } from "./matcher.js";
 import { InProcessLink } from "./inprocess.js";
 import { LedgerChain } from "./ledger.js";
+import { ModelChain } from "./model-chain.js";
 import type { Chain } from "./chain.js";
 import type { Ring as UiRing, SwarmPoint } from "./types.js";
 
@@ -32,6 +33,8 @@ export interface SimOpts {
   baselineBps?: number;
   maxLen?: number;
   chain?: Chain;
+  /** "ledger" (fast, no signatures) or "model" (@nomad/verifier-model, real ed25519). Default: env SIM_BACKEND or "ledger". */
+  backend?: "ledger" | "model";
   onRing?: (r: UiRing) => void;
   onAgents?: (agents: AgentRuntime[]) => void;
   /** Wall-clock pause per round (SERVE mode, so the UI can animate). */
@@ -73,10 +76,13 @@ export const simSigner =
 export async function runSim(o: SimOpts): Promise<SimResult> {
   const rng = rngFrom(o.seed);
   const tokens = SIM_TOKENS.slice(0, Math.max(2, Math.min(o.tokens, SIM_TOKENS.length)));
-  const chain = o.chain ?? new LedgerChain();
-  const ledger = chain instanceof LedgerChain ? chain : null;
   let now = 1_800_000_000_000;
   const clock = () => now;
+  const backend = o.backend ?? (process.env.SIM_BACKEND === "model" ? "model" : "ledger");
+  const chain = o.chain ?? (backend === "model" ? new ModelChain({ now: clock, seed: o.seed }) : new LedgerChain());
+  const ledger = chain instanceof LedgerChain || chain instanceof ModelChain ? chain : null;
+  // ModelChain: real NEP-413 signatures with per-account keys registered in the model
+  const signerOf = (account: string) => (chain instanceof ModelChain ? chain.signer(account) : simSigner(account, rng));
 
   // Fund agents: each holds ~$1-2 of one or two tokens and wants something else.
   const agents = new Map<string, AgentRuntime>();
@@ -98,7 +104,7 @@ export async function runSim(o: SimOpts): Promise<SimResult> {
       id,
       new AgentRuntime(
         { id, strategy, target, margin: rng() * 0.015, sizeFrac: 0.5 + rng() * 0.5, ttlMs: 60_000, verifierId: chain.verifierId },
-        simSigner(id, rng),
+        signerOf(id),
         (ts) => chain.balances(id, ts),
         rngFrom(o.seed * 1000 + i),
       ),
@@ -119,7 +125,7 @@ export async function runSim(o: SimOpts): Promise<SimResult> {
       maxRingsPerRound: 1000,
     },
     chain,
-    simSigner("intents-matcher.nomadswarm.testnet", rng),
+    signerOf("intents-matcher.nomadswarm.testnet"),
     new InProcessLink(agents, clock),
   );
 

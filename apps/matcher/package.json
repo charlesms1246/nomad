@@ -17,11 +17,12 @@
   },
   "dependencies": {
     "@nomad/agent": "workspace:*",
-    "@nomad/ringfinder": "workspace:*",
-    "ws": "^8.18.0",
-    "@nomad/intents": "workspace:*",
     "@nomad/colo": "workspace:*",
-    "@nomad/oneclick": "workspace:*"
+    "@nomad/intents": "workspace:*",
+    "@nomad/oneclick": "workspace:*",
+    "@nomad/ringfinder": "workspace:*",
+    "@nomad/verifier-model": "workspace:*",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
