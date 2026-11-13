@@ -125,4 +125,21 @@ describe("matcher end to end (in-process, fake ledger)", () => {
     expect(rings[0]!.error).toMatch(/a01 \(rate below limit\)/);
     expect(chain.executed).toHaveLength(0);
   });
+
+  it("caps the ring deadline at the earliest offer expiry, so short-lived offers still settle", async () => {
+    const { chain, agents, m, now } = setup();
+    for (const a of agents.values()) a.cfg.ttlMs = 30_000; // shorter than the default 90 s leg deadline
+    const offers = (await Promise.all([...agents.values()].map((a) => a.refresh(tokens, now())))).flat();
+    const rings = await m.round(offers);
+    expect(rings[0]!.status).toBe("settled");
+    expect(Date.parse(rings[0]!.deadline)).toBeLessThan(now() + 30_000);
+    expect(chain.executed).toHaveLength(1);
+  });
+
+  it("leaves out offers that expire within 15 s", async () => {
+    const { agents, m, now } = setup();
+    for (const a of agents.values()) a.cfg.ttlMs = 10_000;
+    const offers = (await Promise.all([...agents.values()].map((a) => a.refresh(tokens, now())))).flat();
+    expect(await m.round(offers)).toEqual([]);
+  });
 });

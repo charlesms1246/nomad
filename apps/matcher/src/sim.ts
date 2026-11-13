@@ -103,7 +103,7 @@ export async function runSim(o: SimOpts): Promise<SimResult> {
     agents.set(
       id,
       new AgentRuntime(
-        { id, strategy, target, margin: rng() * 0.015, sizeFrac: 0.5 + rng() * 0.5, ttlMs: 60_000, verifierId: chain.verifierId },
+        { id, strategy, target, margin: rng() * 0.015, sizeFrac: 0.5 + rng() * 0.5, ttlMs: 600_000, verifierId: chain.verifierId },
         signerOf(id),
         (ts) => chain.balances(id, ts),
         rngFrom(o.seed * 1000 + i),

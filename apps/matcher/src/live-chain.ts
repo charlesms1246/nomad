@@ -1,5 +1,5 @@
 // LiveChain: the matcher's Chain on our testnet Verifier, through @nomad/intents.
-import { IntentsClient, signTokenDiff, type Signer } from "@nomad/intents";
+import { IntentsClient, NearRpc, signTokenDiff, TESTNET_RPC, TESTNET_RPC_FALLBACKS, type Signer } from "@nomad/intents";
 import type { MultiPayload, TokenId } from "@nomad/agent";
 import type { Chain, DiffSigner, ExecResult, SimResult } from "./chain.js";
 
@@ -12,7 +12,7 @@ export class LiveChain implements Chain {
     opts: { rpcUrl?: string; verifierId: string },
     private submitter: Signer,
   ) {
-    this.client = new IntentsClient({ rpcUrl: opts.rpcUrl, verifierId: opts.verifierId });
+    this.client = new IntentsClient({ rpc: new NearRpc(opts.rpcUrl ?? TESTNET_RPC, TESTNET_RPC_FALLBACKS), verifierId: opts.verifierId });
   }
 
   get verifierId() {

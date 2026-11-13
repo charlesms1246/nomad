@@ -30,9 +30,13 @@ export interface MatcherOpts {
   log?: (msg: string, extra?: object) => void;
 }
 
+/** Offers expiring sooner than this are left out of a round. */
+export const MIN_OFFER_LIFE_MS = 15_000;
+
 export class Matcher {
   rings: UiRing[] = [];
   private seq = 0;
+  private expiry = new Map<string, number>();
   constructor(
     public opts: MatcherOpts,
     readonly chain: Chain,
@@ -47,6 +51,10 @@ export class Matcher {
   /** One matching round over the given live offers. Returns the rings attempted. */
   async round(offers: Offer[]): Promise<UiRing[]> {
     const fee = await this.chain.feePips();
+    const now = this.now();
+    // Skip offers about to expire: a leg's deadline must fit before its offer (and nonce) expires.
+    offers = offers.filter((o) => o.expiresAtMs > now + MIN_OFFER_LIFE_MS);
+    this.expiry = new Map(offers.map((o) => [o.id, o.expiresAtMs]));
     const found = findRings(offers, {
       feePips: fee,
       maxLen: this.opts.maxLen ?? 5,
@@ -68,7 +76,9 @@ export class Matcher {
   async settle(r: FoundRing): Promise<UiRing> {
     const now = this.now();
     const salt = await this.chain.salt();
-    const deadline = new Date(now + (this.opts.legDeadlineMs ?? 90_000));
+    // Cap at the earliest offer expiry in the ring (agents sign with a nonce that expires with the offer).
+    const minExpiry = Math.min(...r.legs.map((l) => this.expiry.get(l.offerId) ?? Infinity));
+    const deadline = new Date(Math.min(now + (this.opts.legDeadlineMs ?? 90_000), minExpiry - 1_000));
     const proposal: RingProposal = {
       ringId: r.ringId,
       legs: r.legs,
