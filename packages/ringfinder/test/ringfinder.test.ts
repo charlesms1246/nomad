@@ -111,6 +111,20 @@ describe("no ring", () => {
   });
 });
 
+describe("dust remainders", () => {
+  it("a nearly-filled best-rate offer does not block the rest of its edge", () => {
+    const offers = [
+      offer("a", "a1", W, U, 3.50, 1.0), // best rate on W->U, filled to dust by c
+      offer("b", "a2", W, U, 3.51, 1.0),
+      offer("c", "a3", U, W, 0.2845, 3.5 * 0.99995), // takes almost all of a
+      offer("d", "a4", U, W, 0.2845, 3.5),
+    ];
+    const rings = findRings(offers, { feePips: FEE, nowMs: NOW, priceUsd: PX, decimals: DEC });
+    expect(rings).toHaveLength(2);
+    assertValid(rings, offers);
+  });
+});
+
 describe("k = 2..5", () => {
   it("finds a 5-ring when only the full loop clears", () => {
     const offers = [

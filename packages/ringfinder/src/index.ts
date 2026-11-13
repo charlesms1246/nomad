@@ -229,7 +229,9 @@ export function findRings(input: Offer[], opts: FindOpts): Ring[] {
   const now = opts.nowMs ?? Date.now();
   let offers = input
     .filter((o) => o.expiresAtMs > now && o.giveMax > 0n && o.rateNum > 0n && o.rateDen > 0n && o.give !== o.want)
+    .filter((o) => !isDust(o, o.giveMax, opts))
     .map((o) => ({ ...o }));
+  const original = new Map(offers.map((o) => [o.id, o.giveMax]));
   const rings: Ring[] = [];
   const maxRings = opts.maxRings ?? 1000;
 
@@ -264,9 +266,19 @@ export function findRings(input: Offer[], opts: FindOpts): Ring[] {
       const o = offers.find((x) => x.id === l.offerId)!;
       o.giveMax -= l.giveAmt;
     }
-    offers = offers.filter((o) => o.giveMax >= (opts.minGiveUnits ?? 1000n));
+    // Drop exhausted offers and dust remainders: a dust remainder would otherwise stay the
+    // best-rate offer on its edge and block every other offer there.
+    offers = offers.filter((o) => o.giveMax * 100n >= original.get(o.id)! && !isDust(o, o.giveMax, opts));
   }
   return rings;
+}
+
+/** Below minGiveUnits, or worth less than minLegUsd (default $0.01) when prices are known. */
+function isDust(o: Offer, amt: bigint, opts: FindOpts): boolean {
+  if (amt < (opts.minGiveUnits ?? 1000n)) return true;
+  const p = opts.priceUsd?.[o.give], d = opts.decimals?.[o.give];
+  if (p === undefined || d === undefined) return false;
+  return (Number(amt) / 10 ** d) * p < (opts.minLegUsd ?? 0.01);
 }
 
 export interface SignedDiff {
