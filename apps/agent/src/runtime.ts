@@ -41,7 +41,7 @@ export class AgentRuntime {
   offers: Offer[] = [];
   balances: Record<TokenId, bigint> = {};
   /** ringId -> what this agent promised in that ring (released on SETTLED/FAILED/expiry). */
-  pending = new Map<string, { token: TokenId; amt: bigint; expiresAtMs: number }>();
+  pending = new Map<string, { token: TokenId; amt: bigint; expiresAtMs: number; offerId: string }>();
   unmatchedRounds = 0;
   private seq = 0;
   /**
@@ -129,7 +129,7 @@ export class AgentRuntime {
       memo: `nomad:${p.ringId.slice(0, 16)}`,
       nonce,
     });
-    this.pending.set(p.ringId, { token: r.leg.give, amt: r.leg.giveAmt, expiresAtMs: Date.parse(p.deadline) });
+    this.pending.set(p.ringId, { token: r.leg.give, amt: r.leg.giveAmt, expiresAtMs: Date.parse(p.deadline), offerId: offer.id });
     return { type: "SIGNED", ringId: p.ringId, agent: this.id, signed };
   }
 
@@ -137,7 +137,7 @@ export class AgentRuntime {
     const p = this.pending.get(ringId);
     this.pending.delete(ringId);
     // the offer's nonce is now spent on chain: later legs of this offer need a fresh one
-    if (offerId) for (const k of [...this.offerNonce.keys()]) if (k.startsWith(`${offerId}|`)) this.offerNonce.delete(k);
+    if (offerId) this.rotateNonce(offerId);
     // Shrink the offer that was used; drop it when exhausted.
     if (offerId && gave !== undefined) {
       this.offers = this.offers
@@ -148,8 +148,17 @@ export class AgentRuntime {
     this.unmatchedRounds = 0;
   }
 
-  onFailed(ringId: string) {
+  onFailed(ringId: string, error?: string) {
+    const p = this.pending.get(ringId);
     this.pending.delete(ringId);
+    // "nonce was already used" means another batch carrying this offer's nonce executed (a race we
+    // lost, or a settlement the matcher couldn't confirm because the RPC failed after the tx landed).
+    // Rotate, or every later leg for this offer would carry a spent nonce.
+    if (p && error && /nonce was already used/.test(error)) this.rotateNonce(p.offerId);
+  }
+
+  rotateNonce(offerId: string) {
+    for (const k of [...this.offerNonce.keys()]) if (k.startsWith(`${offerId}|`)) this.offerNonce.delete(k);
   }
 
   private gcPending(nowMs: number) {

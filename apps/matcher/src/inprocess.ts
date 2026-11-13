@@ -13,8 +13,8 @@ export class InProcessLink implements AgentLink {
   settled(agent: string, ringId: string, _tx: string | null, leg: { offerId: string; giveAmt: bigint }) {
     this.agents.get(agent)?.onSettled(ringId, leg.offerId, leg.giveAmt);
   }
-  failed(agent: string, ringId: string) {
-    this.agents.get(agent)?.onFailed(ringId);
+  failed(agent: string, ringId: string, error: string) {
+    this.agents.get(agent)?.onFailed(ringId, error);
   }
 }
 

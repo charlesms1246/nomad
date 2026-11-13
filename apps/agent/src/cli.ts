@@ -80,7 +80,7 @@ async function main() {
       agent.onSettled(m.ringId);
       console.log(`settled ${m.ringId.slice(0, 12)} tx ${m.txHash}`);
     } else if (m.type === "FAILED") {
-      agent.onFailed(m.ringId);
+      agent.onFailed(m.ringId, m.error);
     }
   });
   ws.on("close", () => process.exit(0));
