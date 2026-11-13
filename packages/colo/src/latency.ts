@@ -79,7 +79,7 @@ export async function latency(opts: LatencyOptions = {}): Promise<LatencyReport>
   const target = opts.target ?? DEFAULT_TARGET[network];
   const N = opts.blocks ?? 400;
   const sample = opts.sample ?? 80;
-  const conc = opts.concurrency ?? 4;
+  const conc = opts.concurrency ?? 3;
   const call = (m: string, p: unknown) => rpc(url, m, p);
 
   const layout = await getShardLayout(url);
