@@ -246,7 +246,14 @@ async function main() {
         log("race", { ring: r.ringId.slice(0, 12), prod: [a.status, a.blocksToExec], control: [b.status, b.blocksToExec] });
       }
     }
-    for (const a of agents.values()) a.unmatchedRounds++;
+    for (const a of agents.values()) {
+      a.unmatchedRounds++;
+      // An agent whose wants are met (no live offers) picks a new spending need, so the economy keeps moving.
+      if (a.offers.length === 0) {
+        const others = tokens.filter((t) => t.id !== a.cfg.target);
+        a.cfg.target = others[Math.floor(rng() * others.length)]!.id;
+      }
+    }
     const wait = ROUND_MS - (Date.now() - t0);
     if (wait > 0) await new Promise((res) => setTimeout(res, wait));
   }
