@@ -135,21 +135,26 @@ export class NearRpc {
         const msg = String(e.message);
         if (attempt < 3 && /InvalidNonce|Expired/.test(msg)) continue;
         if (/TIMEOUT_ERROR|HTTP 5|fetch failed/.test(msg)) {
-          res = await this.waitTx(txHash, signer.signerId);
+          res = await this.waitTx(txHash, signer.signerId, 120_000, b64encode(signed));
         } else throw e;
       }
       return this.summarise(txHash, res, opts.withHeights ?? true);
     }
   }
 
-  async waitTx(txHash: string, senderId: string, timeoutMs = 60_000): Promise<any> {
+  /**
+   * Poll for a transaction's outcome. If `signedB64` is given, the same signed bytes are
+   * re-broadcast (idempotent: same hash) whenever the RPC reports the tx as not observed.
+   */
+  async waitTx(txHash: string, senderId: string, timeoutMs = 60_000, signedB64?: string): Promise<any> {
     const t0 = Date.now();
     for (;;) {
+      if (signedB64) await this.call('broadcast_tx_async', [signedB64], 0).catch(() => undefined);
       try {
         return await this.call('tx', { tx_hash: txHash, sender_account_id: senderId, wait_until: 'EXECUTED_OPTIMISTIC' }, 0);
       } catch (e) {
         if (Date.now() - t0 > timeoutMs) throw e;
-        await sleep(1000);
+        await sleep(1500);
       }
     }
   }

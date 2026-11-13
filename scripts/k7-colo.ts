@@ -1,5 +1,7 @@
-// K7: an execute_intents tx sent from an account on the Verifier's shard executes in the inclusion
-// block; from another shard it executes one block later. N txs from each, interleaved.
+// K7: blocks from inclusion to execution of execute_intents, 3 arms, N txs each, interleaved:
+//   (a) a non-self account on the Verifier's shard, (b) an account on another shard,
+//   (c) the Verifier account itself (signer == receiver: a local receipt).
+// Hypothesis (orch, from live/race runs): only (c) executes in the inclusion block.
 // The shard layout is read live (EXPERIMENTAL_protocol_config); nothing is hard-coded.
 import { ONE_NEAR, hasCredentials, loadCredentials, randomKeyPair, saveCredentials, signIntents } from '../packages/intents/src/index.js';
 import { client, CONFIG, explorer, fundAgents, implicitAgent, log, parent, PARENT, rpc, saveResult, T } from './k-lib.js';
@@ -20,7 +22,7 @@ for (const id of [COLO, CTL]) {
   const r = await rpc.sendTx(parent, id, [{ type: 'CreateAccount' }, { type: 'Transfer', deposit: ONE_NEAR / 2n }, { type: 'AddKey', publicKey: kp.publicKeyStr, permission: 'FullAccess' }]);
   log('created', id, r.txHash, r.ok);
 }
-const submitters = [COLO, CTL].map((id) => ({ id, shard: shardOf(id), signer: { signerId: id, secretKey: loadCredentials(id).private_key } }));
+const submitters = [COLO, CTL, CONFIG.verifierId].map((id) => ({ id, shard: shardOf(id), signer: { signerId: id, secretKey: loadCredentials(id).private_key } }));
 
 // One funded agent signs 2N independent 1-unit transfers (fee-free), one per tx.
 const W = T.wNEAR!.id;
@@ -43,8 +45,10 @@ const summary = submitters.map((s) => {
   for (const x of r) hist[x.blocksToExecute] = (hist[x.blocksToExecute] ?? 0) + 1;
   return { account: s.id, shard: s.shard, sameShardAsVerifier: s.shard === vShard, n: r.length, sameBlock: r.filter((x) => x.blocksToExecute === 0).length, histogram: hist };
 });
-const colo = summary[0]!;
-const pass = colo.n >= N && colo.sameBlock === colo.n;
-saveResult('k7-colo', { pass, N, verifierShard: vShard, layout, summary, rows: rows.map((r) => ({ ...r, explorer: explorer(r.tx) })) });
+const [a, b, c] = summary;
+// K7 as specified (same-shard matcher executes in the inclusion block) passes only if (a) is 0-block.
+const pass = a!.n >= N && a!.sameBlock === a!.n;
+const finding = { sameShardNonSelf: a!.histogram, otherShard: b!.histogram, selfSigned: c!.histogram, onlySelfSignedSavesBlock: a!.sameBlock === 0 && b!.sameBlock === 0 && c!.sameBlock === c!.n };
+saveResult('k7-colo', { pass, finding, N, verifierShard: vShard, layout, summary, rows: rows.map((r) => ({ ...r, explorer: explorer(r.tx) })) });
 log(JSON.stringify(summary));
 log(pass ? 'K7 PASS' : 'K7 FAIL');

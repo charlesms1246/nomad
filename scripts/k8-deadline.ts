@@ -51,7 +51,7 @@ const ex1 = await client.execute(legs, parent);
 const ex2 = await client.execute(legs, parent);
 out.replay = { first: { tx: ex1.txHash, ok: ex1.ok }, second: { tx: ex2.txHash, ok: ex2.ok, error: ex2.error } };
 
-const brief = (r: any) => (r && 'ok' in r && 'errorClass' in r ? { ok: r.ok, error: r.error } : r);
+const brief = (r: any) => (r && typeof r === 'object' && 'ok' in r && 'intentsExecuted' in r || (r && typeof r === 'object' && 'errorClass' in r) ? { ok: r.ok, error: r.error } : r);
 const res = Object.fromEntries(Object.entries(out).map(([k, v]) => [k, brief(v)]));
 log(JSON.stringify(res, null, 1));
 const pass =
