@@ -44,7 +44,7 @@ export class NearRpc {
 
   constructor(readonly url: string = TESTNET_RPC) {}
 
-  async call<T = any>(method: string, params: unknown, retries = 4): Promise<T> {
+  async call<T = any>(method: string, params: unknown, retries = 6): Promise<T> {
     let lastErr: unknown;
     for (let i = 0; i <= retries; i++) {
       try {
@@ -67,7 +67,7 @@ export class NearRpc {
       } catch (e: any) {
         lastErr = e;
         if (e?.fatal) throw e;
-        await sleep(300 * 2 ** i);
+        await sleep(Math.min(8000, 300 * 2 ** i));
       }
     }
     throw lastErr;

@@ -104,7 +104,8 @@ export class IntentsClient {
     try {
       out = await this.rpc.view(this.verifierId, 'simulate_intents', { signed });
     } catch (e) {
-      if (!(e instanceof RpcError)) throw e;
+      // Only contract execution errors are rejections; transport errors (429, timeouts) are rethrown.
+      if (!(e instanceof RpcError) || !/panicked|GuestPanic|wasm execution failed|FunctionCallError/.test(e.message)) throw e;
       const error = panicMessage(e);
       return { ok: false, error, errorClass: errorClassOf(error) };
     }

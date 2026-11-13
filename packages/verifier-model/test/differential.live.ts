@@ -211,7 +211,7 @@ async function worker() {
     const c = await client.simulate(batch);
     const sameOutcome = m.ok === c.ok;
     const sameClass = m.ok || m.errorClass === c.errorClass;
-    const sameUnmatched = m.errorClass !== 'invariant violated' || JSON.stringify(m.invariantViolated?.unmatched_deltas) === JSON.stringify(sortObj((c.invariantViolated as any)?.unmatched_deltas));
+    const sameUnmatched = m.errorClass !== 'invariant violated' || JSON.stringify(sortObj(m.invariantViolated?.unmatched_deltas)) === JSON.stringify(sortObj((c.invariantViolated as any)?.unmatched_deltas));
     const sameHashes = !m.ok || JSON.stringify(m.intentsExecuted.map((x) => x.intent_hash)) === JSON.stringify(c.intentsExecuted?.map((x) => x.intent_hash));
     const agree = sameOutcome && sameClass && sameUnmatched && sameHashes;
     if (!agree) {
@@ -224,7 +224,7 @@ async function worker() {
 function sortObj(o: Record<string, string> | undefined) {
   return o && Object.fromEntries(Object.entries(o).sort(([a], [b]) => (a < b ? -1 : 1)));
 }
-await Promise.all(Array.from({ length: 6 }, worker));
+await Promise.all(Array.from({ length: 3 }, worker));
 rows.sort((a, b) => a.i - b.i);
 
 const byKind: Record<string, { n: number; accepted: number; agree: number; classes: Record<string, number> }> = {};
