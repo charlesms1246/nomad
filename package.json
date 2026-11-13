@@ -2,9 +2,12 @@
   "name": "nomad",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "test": "pnpm -r --if-present test",
+    "test": "pnpm -r --filter \"./packages/*\" --filter \"./apps/*\" build && pnpm -r --if-present test",
     "build": "pnpm -r --if-present build"
-  }
+  },
+  "packageManager": "pnpm@9.15.0"
 }

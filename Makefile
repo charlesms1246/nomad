@@ -22,7 +22,7 @@ SWEEP ?= 1
 PORT ?= 8787
 TSX := pnpm exec tsx
 
-.PHONY: help install build test test-ts test-rust sim sim-serve dry-run ui live race fixtures kill-tests accounts fund fixture-accounts colo-check clean
+.PHONY: help install build test test-ts test-rust test-sandbox sim sim-serve dry-run ui live race fixtures kill-tests accounts fund fixture-accounts colo-check clean
 
 help:
 	@sed -n '1,14p' Makefile
@@ -40,8 +40,13 @@ test: test-ts test-rust
 test-ts: build
 	pnpm -r --filter "./packages/*" --filter "./apps/*" test
 
+# Board unit tests (no wasm needed). The near-workspaces sandbox test needs the wasm and cargo-near: `make test-sandbox`.
 test-rust:
-	cd contracts/board && cargo test --quiet
+	cd contracts/board && cargo test --quiet --lib
+
+test-sandbox:
+	command -v cargo-near >/dev/null || cargo install cargo-near --version 0.23.0 --locked
+	cd contracts/board && cargo near build non-reproducible-wasm && cargo test --quiet --test sandbox
 
 sim: build
 	cd apps/matcher && AGENTS=$(AGENTS) TOKENS=$(TOKENS) SEED=$(SEED) ROUNDS=$(ROUNDS) SWEEP=$(SWEEP) OUT_DIR=$(CURDIR)/out $(TSX) src/cli-sim.ts
