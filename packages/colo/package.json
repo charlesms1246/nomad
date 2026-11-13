@@ -1,0 +1,27 @@
+{
+  "name": "@nomad/colo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Place a NEAR account on a target contract's shard (the NOMADS feature): library, CLI and MCP server.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "bin": { "colo": "dist/cli.js", "colo-mcp": "dist/mcp.js" },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:live": "COLO_LIVE=1 vitest run test/live.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
