@@ -2,8 +2,10 @@
 //!
 //! A public record of agent offers plus an advisory ring log. It enforces the
 //! offer rules of `RULES.md` §2 and the `record_ring` permission of §6. It holds
-//! no funds other than storage deposits, which are refunded when an offer is
-//! replaced, cancelled or pruned.
+//! no funds other than storage deposits. A freed offer deposit (replace, cancel,
+//! prune) is credited to the agent's prepaid storage balance, which pays for
+//! later posts (so agents can post with a function-call key and 0 attached) and
+//! can be withdrawn with `storage_withdraw`.
 //!
 //! Storage accounting uses the legacy `near_sdk::collections` types on purpose:
 //! they write to the trie immediately, so `env::storage_usage()` measured inside
@@ -34,6 +36,8 @@ pub const MAX_RING_STR_LEN: usize = 128;
 pub const MAX_PRUNE: u32 = 100;
 /// Max page size for views.
 pub const MAX_PAGE: u32 = 200;
+/// Minimum `storage_deposit` (it also pays for the balance entry itself).
+pub const MIN_STORAGE_DEPOSIT: NearToken = NearToken::from_millinear(1);
 /// Suggested deposit for `post_offer`; the excess is refunded.
 pub const OFFER_DEPOSIT_HINT: NearToken = NearToken::from_millinear(10);
 
@@ -49,6 +53,7 @@ enum StorageKey {
     ByAgent,
     Matchers,
     Rings,
+    StorageBalances,
 }
 
 /// Public offer shape (TECH_DOC §4 / §7).
@@ -125,6 +130,9 @@ pub struct Board {
     matchers: UnorderedSet<AccountId>,
     /// Ring log ring buffer: slot (seq % RING_LOG_CAP) -> record.
     rings: LookupMap<u64, RingRecord>,
+    /// Prepaid storage balances (yocto). Lets agents post with a function-call
+    /// key, which cannot attach a deposit. Freed offer deposits land here.
+    storage_balances: LookupMap<AccountId, u128>,
     ring_count: u64,
     total_posted: u64,
     total_replaced: u64,
@@ -171,6 +179,7 @@ impl Board {
             by_agent: LookupMap::new(StorageKey::ByAgent),
             matchers: UnorderedSet::new(StorageKey::Matchers),
             rings: LookupMap::new(StorageKey::Rings),
+            storage_balances: LookupMap::new(StorageKey::StorageBalances),
             ring_count: 0,
             total_posted: 0,
             total_replaced: 0,
@@ -182,8 +191,10 @@ impl Board {
     // ------------------------------------------------------------------ writes
 
     /// Post (or replace) the caller's offer for (give, want). Returns the new id.
-    /// The attached deposit must cover the storage used; the excess (plus the
-    /// deposit of a replaced offer) is refunded to the caller.
+    /// Storage is paid by the attached deposit plus a replaced offer's deposit,
+    /// then by the caller's prepaid balance (`storage_deposit`), so 0 attached
+    /// works with a function-call key. Excess attached deposit is refunded;
+    /// leftover replaced-offer credit stays in the prepaid balance.
     #[payable]
     pub fn post_offer(
         &mut self,
@@ -241,15 +252,23 @@ impl Board {
         // Record the deposit charged (rewrite with the real value; same size).
         self.offers.insert(&id, &StoredOffer { offer: offer.clone(), storage_deposit: required });
 
-        let available = attached + credit;
+        // Pay: attached deposit + replaced offer's credit first, then the
+        // prepaid balance. Leftover credit goes to the prepaid balance; leftover
+        // attached deposit is refunded to the caller.
+        let balance = self.storage_balances.get(&agent).unwrap_or(0);
         require!(
-            available >= required,
+            attached + credit + balance >= required,
             format!(
-                "insufficient storage deposit: attached {} yocto, required {} yocto ({} bytes)",
-                attached, required, bytes
+                "insufficient storage deposit: attached {} + credit {} + prepaid {} yocto < required {} yocto ({} bytes); attach more or call storage_deposit",
+                attached, credit, balance, required, bytes
             )
         );
-        refund(&agent, available - required);
+        let from_attached = attached.min(required);
+        let rest = required - from_attached;
+        let from_credit = credit.min(rest);
+        let from_balance = rest - from_credit;
+        self.set_balance(&agent, balance - from_balance + (credit - from_credit));
+        refund(&agent, attached - from_attached);
         self.total_posted += 1;
 
         let mut data = offer_json(&offer);
@@ -261,7 +280,8 @@ impl Board {
         id
     }
 
-    /// Cancel one of the caller's offers. Refunds its storage deposit.
+    /// Cancel one of the caller's offers. Its storage deposit is credited to the
+    /// caller's prepaid storage balance (withdraw with `storage_withdraw`).
     pub fn cancel_offer(&mut self, id: u64) {
         let stored = self.offers.get(&id).unwrap_or_else(|| env::panic_str("offer not found"));
         require!(
@@ -269,7 +289,7 @@ impl Board {
             "only the offer's agent can cancel it"
         );
         let stored = self.remove_offer(id);
-        refund(&stored.offer.agent, stored.storage_deposit);
+        self.credit_balance(&stored.offer.agent, stored.storage_deposit);
         self.total_cancelled += 1;
         emit(
             "offer_cancelled",
@@ -277,8 +297,8 @@ impl Board {
         );
     }
 
-    /// Remove up to `limit` expired offers (oldest expiry first) and refund
-    /// their storage to the owners. Anyone may call. Returns the number pruned.
+    /// Remove up to `limit` expired offers (oldest expiry first) and credit
+    /// their storage deposits to the owners' prepaid balances. Anyone may call. Returns the number pruned.
     pub fn prune_expired(&mut self, limit: u32) -> u32 {
         let limit = limit.min(MAX_PRUNE);
         let now = now_ms();
@@ -292,7 +312,7 @@ impl Board {
         let pruner = env::predecessor_account_id();
         for id in &expired {
             let stored = self.remove_offer(*id);
-            refund(&stored.offer.agent, stored.storage_deposit);
+            self.credit_balance(&stored.offer.agent, stored.storage_deposit);
             self.total_expired += 1;
             emit(
                 "offer_expired",
@@ -337,6 +357,42 @@ impl Board {
         self.rings.insert(&(seq % RING_LOG_CAP), &rec);
         self.ring_count += 1;
         emit("ring_recorded", offer_json(&rec));
+    }
+
+    // --------------------------------------------------------- storage balance
+
+    /// Credit the attached NEAR to `account_id` (default: caller) as a prepaid
+    /// storage balance for `post_offer`. Returns the new balance.
+    #[payable]
+    pub fn storage_deposit(&mut self, account_id: Option<AccountId>) -> U128 {
+        let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
+        let amount = env::attached_deposit().as_yoctonear();
+        require!(
+            amount >= MIN_STORAGE_DEPOSIT.as_yoctonear(),
+            "storage_deposit requires at least 0.001 NEAR"
+        );
+        let new = self.storage_balances.get(&account_id).unwrap_or(0) + amount;
+        self.set_balance(&account_id, new);
+        U128(new)
+    }
+
+    /// Withdraw `amount` (default: all) of the caller's prepaid balance.
+    /// Requires exactly 1 yocto, so only a full-access key can call it.
+    #[payable]
+    pub fn storage_withdraw(&mut self, amount: Option<U128>) -> U128 {
+        near_sdk::assert_one_yocto();
+        let account_id = env::predecessor_account_id();
+        let balance = self.storage_balances.get(&account_id).unwrap_or(0);
+        let amount = amount.map(|a| a.0).unwrap_or(balance);
+        require!(amount <= balance, "amount exceeds storage balance");
+        let new = balance - amount;
+        self.set_balance(&account_id, new);
+        refund(&account_id, amount + 1);
+        U128(new)
+    }
+
+    pub fn storage_balance_of(&self, account_id: AccountId) -> U128 {
+        U128(self.storage_balances.get(&account_id).unwrap_or(0))
     }
 
     // ------------------------------------------------------------------ owner
@@ -443,6 +499,19 @@ impl Board {
 }
 
 impl Board {
+    fn set_balance(&mut self, account_id: &AccountId, amount: u128) {
+        if amount == 0 {
+            self.storage_balances.remove(account_id);
+        } else {
+            self.storage_balances.insert(account_id, &amount);
+        }
+    }
+
+    fn credit_balance(&mut self, account_id: &AccountId, amount: u128) {
+        let cur = self.storage_balances.get(account_id).unwrap_or(0);
+        self.set_balance(account_id, cur + amount);
+    }
+
     fn assert_owner(&self) {
         require!(env::predecessor_account_id() == self.owner_id, "owner only");
     }

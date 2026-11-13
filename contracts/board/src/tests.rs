@@ -119,7 +119,8 @@ fn replace_same_pair() {
     assert_eq!(mine[0].id, second);
     assert_eq!(mine[0].give_max, U128(500));
     let second_dep = b.offer_storage_deposit(second).unwrap().0;
-    assert_eq!(transfers_to("a01.nomadswarm.testnet"), first_dep - second_dep);
+    assert_eq!(transfers_to("a01.nomadswarm.testnet"), 0);
+    assert_eq!(b.storage_balance_of(acc("a01.nomadswarm.testnet")).0, first_dep - second_dep);
     assert_eq!(events("offer_posted")[0]["data"][0]["replaced_id"], first);
     assert_eq!(b.stats().total_replaced, 1);
     assert_eq!(b.stats().stored_offers, 1);
@@ -145,9 +146,11 @@ fn replace_and_cancel_release_all_storage() {
         b.offer_storage_deposit(id).unwrap().0
     );
     let id2 = b.post_offer("nep141:usdc".into(), U128(1), "nep141:wnear".into(), U128(1), U128(1), 1000);
-    assert_eq!(env::storage_usage(), after_first, "replacing must not grow storage");
+    // The only growth is the new prepaid-balance entry holding the old deposit.
+    let entry = env::storage_usage() - after_first;
+    assert!(entry < 100, "balance entry {} bytes", entry);
     b.cancel_offer(id2);
-    assert_eq!(env::storage_usage(), base, "cancel frees everything");
+    assert_eq!(env::storage_usage(), base + entry, "cancel frees all offer storage");
 }
 
 #[test]
@@ -159,7 +162,8 @@ fn cancel_by_owner_refunds() {
     b.cancel_offer(id);
     assert!(b.get_offer(id).is_none());
     assert!(b.offers_by_agent(acc("a01.nomadswarm.testnet")).is_empty());
-    assert_eq!(transfers_to("a01.nomadswarm.testnet"), dep);
+    assert_eq!(transfers_to("a01.nomadswarm.testnet"), 0, "refund goes to the prepaid balance");
+    assert_eq!(b.storage_balance_of(acc("a01.nomadswarm.testnet")).0, dep);
     let ev = events("offer_cancelled");
     assert_eq!(ev[0]["data"][0]["id"], id);
     assert_eq!(b.stats().total_cancelled, 1);
@@ -219,12 +223,12 @@ fn expiry_and_prune() {
     assert_eq!(b.prune_expired(1), 1);
     assert!(b.get_offer(a).is_none());
     assert!(b.get_offer(d).is_some());
-    assert_eq!(transfers_to("a01.nomadswarm.testnet"), dep_a);
+    assert_eq!(b.storage_balance_of(acc("a01.nomadswarm.testnet")).0, dep_a);
 
     ctx("anyone.testnet", NearToken::from_yoctonear(0), T0 + 3_000);
     assert_eq!(b.prune_expired(10), 1);
-    assert_eq!(transfers_to("a03.nomadswarm.testnet"), dep_d);
-    assert_eq!(transfers_to("anyone.testnet"), 0);
+    assert_eq!(b.storage_balance_of(acc("a03.nomadswarm.testnet")).0, dep_d);
+    assert!(get_created_receipts().is_empty(), "prune makes no transfers");
     let ev = events("offer_expired");
     assert_eq!(ev[0]["data"][0]["id"], d);
     assert_eq!(ev[0]["data"][0]["pruned_by"], "anyone.testnet");
@@ -422,4 +426,140 @@ fn set_rules_non_owner_rejected() {
     let mut b = setup();
     ctx("a01.nomadswarm.testnet", NearToken::from_yoctonear(0), T0);
     b.set_rules("x".into(), "y".into());
+}
+
+// ---------------------------------------------------------------- prepaid storage
+
+const A1: &str = "a01.nomadswarm.testnet";
+const ZERO: NearToken = NearToken::from_yoctonear(0);
+
+#[test]
+fn storage_deposit_and_balance_of() {
+    let mut b = setup();
+    ctx(A1, NearToken::from_millinear(50), T0);
+    assert_eq!(b.storage_deposit(None).0, NearToken::from_millinear(50).as_yoctonear());
+    // Deposit on behalf of another account.
+    ctx("funder.testnet", NearToken::from_millinear(20), T0);
+    b.storage_deposit(Some(acc(A1)));
+    assert_eq!(b.storage_balance_of(acc(A1)).0, NearToken::from_millinear(70).as_yoctonear());
+    assert_eq!(b.storage_balance_of(acc("funder.testnet")).0, 0);
+}
+
+#[test]
+#[should_panic(expected = "storage_deposit requires at least 0.001 NEAR")]
+fn storage_deposit_too_small() {
+    let mut b = setup();
+    ctx(A1, NearToken::from_yoctonear(1), T0);
+    b.storage_deposit(None);
+}
+
+#[test]
+fn post_with_zero_attached_uses_prepaid_balance() {
+    let mut b = setup();
+    let prepaid = NearToken::from_millinear(20).as_yoctonear();
+    ctx(A1, NearToken::from_millinear(20), T0);
+    b.storage_deposit(None);
+    ctx(A1, ZERO, T0);
+    let id = b.post_offer("t:a".into(), U128(1), "t:b".into(), U128(1), U128(1), 1000);
+    let dep = b.offer_storage_deposit(id).unwrap().0;
+    assert_eq!(b.storage_balance_of(acc(A1)).0, prepaid - dep);
+    assert!(get_created_receipts().is_empty(), "no transfer when nothing attached");
+    // Cancel puts the deposit back into the balance.
+    b.cancel_offer(id);
+    assert_eq!(b.storage_balance_of(acc(A1)).0, prepaid);
+}
+
+#[test]
+fn attached_used_before_prepaid_balance() {
+    let mut b = setup();
+    let prepaid = NearToken::from_millinear(20).as_yoctonear();
+    ctx(A1, NearToken::from_millinear(20), T0);
+    b.storage_deposit(None);
+    let id = post(&mut b, A1, "t:a", "t:b", 1000, T0);
+    let dep = b.offer_storage_deposit(id).unwrap().0;
+    assert_eq!(b.storage_balance_of(acc(A1)).0, prepaid, "balance untouched");
+    assert_eq!(transfers_to(A1), DEPOSIT.as_yoctonear() - dep);
+}
+
+#[test]
+fn partial_attached_topped_up_from_balance() {
+    let mut b = setup();
+    let prepaid = NearToken::from_millinear(20).as_yoctonear();
+    ctx(A1, NearToken::from_millinear(20), T0);
+    b.storage_deposit(None);
+    let small = 1_000_000_000_000_000_000_000u128; // 0.001 NEAR, less than one offer
+    ctx(A1, NearToken::from_yoctonear(small), T0);
+    let id = b.post_offer("t:a".into(), U128(1), "t:b".into(), U128(1), U128(1), 1000);
+    let dep = b.offer_storage_deposit(id).unwrap().0;
+    assert!(dep > small);
+    assert_eq!(b.storage_balance_of(acc(A1)).0, prepaid - (dep - small));
+    assert_eq!(transfers_to(A1), 0);
+}
+
+#[test]
+#[should_panic(expected = "insufficient storage deposit")]
+fn zero_attached_without_balance_rejected() {
+    let mut b = setup();
+    ctx(A1, ZERO, T0);
+    b.post_offer("t:a".into(), U128(1), "t:b".into(), U128(1), U128(1), 1000);
+}
+
+#[test]
+fn replace_with_zero_attached_keeps_balance_consistent() {
+    let mut b = setup();
+    let prepaid = NearToken::from_millinear(20).as_yoctonear();
+    ctx(A1, NearToken::from_millinear(20), T0);
+    b.storage_deposit(None);
+    ctx(A1, ZERO, T0);
+    let id1 = b.post_offer("t:a".into(), U128(1), "t:b".into(), U128(1), U128(1), 1000);
+    let id2 = b.post_offer("t:a".into(), U128(2), "t:b".into(), U128(1), U128(1), 1000);
+    let dep2 = b.offer_storage_deposit(id2).unwrap().0;
+    assert!(b.get_offer(id1).is_none());
+    assert_eq!(b.storage_balance_of(acc(A1)).0, prepaid - dep2);
+}
+
+#[test]
+fn prune_credits_prepaid_balance() {
+    let mut b = setup();
+    ctx(A1, NearToken::from_millinear(20), T0);
+    b.storage_deposit(None);
+    ctx(A1, ZERO, T0);
+    b.post_offer("t:a".into(), U128(1), "t:b".into(), U128(1), U128(1), 10);
+    ctx("anyone.testnet", ZERO, T0 + 100);
+    assert_eq!(b.prune_expired(5), 1);
+    assert_eq!(b.storage_balance_of(acc(A1)).0, NearToken::from_millinear(20).as_yoctonear());
+    assert!(get_created_receipts().is_empty());
+}
+
+#[test]
+fn storage_withdraw_partial_and_full() {
+    let mut b = setup();
+    let prepaid = NearToken::from_millinear(20).as_yoctonear();
+    ctx(A1, NearToken::from_millinear(20), T0);
+    b.storage_deposit(None);
+    ctx(A1, NearToken::from_yoctonear(1), T0);
+    assert_eq!(b.storage_withdraw(Some(U128(5))).0, prepaid - 5);
+    assert_eq!(transfers_to(A1), 5 + 1);
+    ctx(A1, NearToken::from_yoctonear(1), T0);
+    assert_eq!(b.storage_withdraw(None).0, 0);
+    assert_eq!(transfers_to(A1), prepaid - 5 + 1);
+    assert_eq!(b.storage_balance_of(acc(A1)).0, 0);
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn storage_withdraw_needs_one_yocto() {
+    let mut b = setup();
+    ctx(A1, NearToken::from_millinear(20), T0);
+    b.storage_deposit(None);
+    ctx(A1, ZERO, T0);
+    b.storage_withdraw(None);
+}
+
+#[test]
+#[should_panic(expected = "amount exceeds storage balance")]
+fn storage_withdraw_over_balance() {
+    let mut b = setup();
+    ctx(A1, NearToken::from_yoctonear(1), T0);
+    b.storage_withdraw(Some(U128(1)));
 }
