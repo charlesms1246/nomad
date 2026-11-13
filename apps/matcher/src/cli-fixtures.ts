@@ -43,8 +43,8 @@ async function main() {
       const giveMax = BigInt(Math.floor((LEG_USD / t.priceUsd) * 10 ** Math.min(t.decimals, 15))) * 10n ** BigInt(Math.max(0, t.decimals - 15));
       return { id: `fx-${name}-${i}`, agent: who[i]!, give: t.id, giveMax, want: next.id, rateNum: r.rateNum, rateDen: r.rateDen, expiresAtMs: DEADLINE.getTime() };
     });
-    const sized = sizeRing(offers, { feePips: fee, phi: 0.2 });
-    if (!sized) throw new Error(`${name}: no surplus`);
+    const sized = sizeRing(offers, { feePips: fee, phi: 0.2, minGiveUnits: 1n });
+    if (!sized) throw new Error(`${name}: ring cannot be sized (no surplus or below the size floor)`);
     const ring = { ...sized, ringId: name };
     const diffs = diffsFor(ring, matcher);
     if (!netsToZero(diffs, fee).ok) throw new Error(`${name}: does not net to zero`);

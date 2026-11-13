@@ -148,7 +148,7 @@ export function sizeRing(offers: Offer[], opts: FindOpts): Omit<Ring, "ringId"> 
       continue;
     }
     if (sized === null) return null;
-    const minUnits = opts.minGiveUnits ?? 1000n;
+    const minUnits = minUnitsOf(opts);
     if (sized.legs.some((l) => l.giveAmt < minUnits)) return null;
     let surplusUsd: number | null = null;
     const t0 = offers[0]!.give;
@@ -273,9 +273,12 @@ export function findRings(input: Offer[], opts: FindOpts): Ring[] {
   return rings;
 }
 
+/** Default floor: 1000 smallest units without prices; 1 unit when prices give a USD floor instead. */
+const minUnitsOf = (opts: FindOpts) => opts.minGiveUnits ?? (opts.priceUsd ? 1n : 1000n);
+
 /** Below minGiveUnits, or worth less than minLegUsd (default $0.01) when prices are known. */
 function isDust(o: Offer, amt: bigint, opts: FindOpts): boolean {
-  if (amt < (opts.minGiveUnits ?? 1000n)) return true;
+  if (amt < (minUnitsOf(opts))) return true;
   const p = opts.priceUsd?.[o.give], d = opts.decimals?.[o.give];
   if (p === undefined || d === undefined) return false;
   return (Number(amt) / 10 ** d) * p < (opts.minLegUsd ?? 0.01);
