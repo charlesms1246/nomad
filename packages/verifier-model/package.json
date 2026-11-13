@@ -1,0 +1,26 @@
+{
+  "name": "@nomad/verifier-model",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A TypeScript model of the NEAR Intents Verifier (defuse 0.4.5) for token_diff/transfer batches: signatures, keys, salts, nonces, deadlines, sequential balances, the 1-pip fee and the zero-sum invariant. Differential-tested against simulate_intents.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "diff:live": "tsx test/differential.live.ts"
+  },
+  "dependencies": {
+    "@nomad/intents": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.23.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
