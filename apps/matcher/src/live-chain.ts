@@ -35,7 +35,17 @@ export class LiveChain implements Chain {
   }
 
   async simulate(signed: MultiPayload[]): Promise<SimResult> {
-    const r = await this.client.simulate(signed as never);
+    // @nomad/intents rethrows transport errors (429, timeouts); retry those, never contract errors.
+    let r: Awaited<ReturnType<IntentsClient["simulate"]>> | undefined;
+    for (let i = 0; ; i++) {
+      try {
+        r = await this.client.simulate(signed as never);
+        break;
+      } catch (e) {
+        if (i >= 4) return { ok: false, error: `rpc: ${String(e).slice(0, 200)}` };
+        await new Promise((res) => setTimeout(res, 500 * 2 ** i));
+      }
+    }
     return { ok: r.ok, error: r.errorClass ? `${r.errorClass}: ${r.error ?? ""}` : r.error, intentsExecuted: r.intentsExecuted?.length };
   }
 
