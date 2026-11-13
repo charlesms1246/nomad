@@ -96,7 +96,8 @@ export class LedgerChain implements Chain {
       ok: true,
       txHash: `sim-${this.txs.toString().padStart(6, "0")}`,
       blockHeight: this.height,
-      blocksToExec: 0,
+      // A matcher signing its own tx waits one block (K7: only signer == Verifier executes in-block).
+      blocksToExec: 1,
       // ~5.3 Tgas for 2 signers measured on mainnet (F16); ~20.5 Tgas for a 3-signer batch (C3)
       gasBurntTgas: null,
     };
