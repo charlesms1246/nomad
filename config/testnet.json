@@ -1,0 +1,17 @@
+{
+  "network": "testnet",
+  "rpcUrl": "https://rpc.testnet.fastnear.com",
+  "verifierId": "intents.nomadswarm.testnet",
+  "verifierVersion": "defuse 0.4.5 (near/intents 16d04f6, unmodified source)",
+  "feePips": 1,
+  "feeCollector": "fees.nomadswarm.testnet",
+  "wnearId": "wrap.testnet",
+  "tokenOwner": "nomadswarm.testnet",
+  "tokens": [
+    { "symbol": "wNEAR", "contract": "wnear.nomadswarm.testnet", "id": "nep141:wnear.nomadswarm.testnet", "decimals": 24, "mainnetAsset": "nep141:wrap.near" },
+    { "symbol": "USDC", "contract": "usdc.nomadswarm.testnet", "id": "nep141:usdc.nomadswarm.testnet", "decimals": 6, "mainnetAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1" },
+    { "symbol": "USDT", "contract": "usdt.nomadswarm.testnet", "id": "nep141:usdt.nomadswarm.testnet", "decimals": 6, "mainnetAsset": "nep141:usdt.tether-token.near" },
+    { "symbol": "BTC", "contract": "btc.nomadswarm.testnet", "id": "nep141:btc.nomadswarm.testnet", "decimals": 8, "mainnetAsset": "nep141:btc.omft.near" },
+    { "symbol": "ZEC", "contract": "zec.nomadswarm.testnet", "id": "nep141:zec.nomadswarm.testnet", "decimals": 8, "mainnetAsset": "nep141:zec.omft.near" }
+  ]
+}
