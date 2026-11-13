@@ -17,14 +17,15 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.12",
+    "fast-check": "^4",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0",
-    "@types/ws": "^8.5.12"
+    "vitest": "^2.1.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@nomad/intents": "workspace:*",
     "ws": "^8.18.0",
-    "@modelcontextprotocol/sdk": "^1.32.0",
     "zod": "^3.25.0"
   },
   "bin": {
