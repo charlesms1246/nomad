@@ -22,7 +22,7 @@ SWEEP ?= 1
 PORT ?= 8787
 TSX := pnpm exec tsx
 
-.PHONY: help install build test test-ts test-rust test-sandbox sim sim-serve dry-run ui live race fixtures race3 relayer-key kill-tests accounts fund fixture-accounts colo-check clean
+.PHONY: help install build test test-ts test-rust test-sandbox sim sim-serve dry-run ui live race fixtures race3 relayer-key ui-check kill-tests accounts fund fixture-accounts colo-check clean
 
 help:
 	@sed -n '1,14p' Makefile
@@ -61,6 +61,10 @@ dry-run: build
 ui:
 	cd web && npm install && MATCHER_URL=$${MATCHER_URL:-http://localhost:$(PORT)} npm run dev
 
+# Local UI check: sim matcher + a web/ dev instance (not the deployed UI) + headless screenshot.
+ui-check: build
+	./scripts/ui-check.sh
+
 accounts: build
 	cd apps/matcher && $(TSX) src/cli-accounts.ts
 
@@ -81,7 +85,11 @@ relayer-key: build
 	cd apps/matcher && $(TSX) src/cli-relayer-key.ts
 
 # Fixture agents fx01..fx12 are separate from the live agents, so live trading never drains them.
-fixture-accounts: build
+fixture-# Local UI check: sim matcher + a web/ dev instance (not the deployed UI) + headless screenshot.
+ui-check: build
+	./scripts/ui-check.sh
+
+accounts: build
 	cd apps/matcher && AGENT_PREFIX=fx AGENT_NEAR=0.15 SKIP_BOARD_KEYS=1 $(TSX) src/cli-accounts.ts && AGENT_PREFIX=fx SKIP_BOARD=1 FUND_USD=0.75 $(TSX) src/cli-fund.ts
 
 fixtures: build
