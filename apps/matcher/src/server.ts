@@ -83,13 +83,18 @@ export class WsLink implements AgentLink {
   }
 }
 
-export function startServer(opts: { port: number; state: () => NomadState; link?: WsLink; log?: (m: string) => void }) {
+export function startServer(opts: { port: number; host?: string; state: () => NomadState; link?: WsLink; log?: (m: string) => void }) {
   const server = http.createServer((req, res) => {
     const cors = {
       "access-control-allow-origin": "*",
       "access-control-allow-methods": "GET, OPTIONS",
       "access-control-allow-headers": "content-type",
     };
+    // read-only API: only GET/OPTIONS
+    if (req.method !== "GET" && req.method !== "OPTIONS") {
+      res.writeHead(405, cors);
+      return res.end("method not allowed");
+    }
     if (req.method === "OPTIONS") {
       res.writeHead(204, cors);
       return res.end();
@@ -110,6 +115,8 @@ export function startServer(opts: { port: number; state: () => NomadState; link?
     const wss = new WebSocketServer({ server, path: "/ws" });
     wss.on("connection", (ws) => opts.link!.attach(ws));
   }
-  server.listen(opts.port, () => opts.log?.(`matcher API on http://localhost:${opts.port}/api/state`));
+  server.listen(opts.port, opts.host, () =>
+    opts.log?.(`matcher API on http://${opts.host ?? "localhost"}:${opts.port}/api/state${opts.link ? " (+ /ws agent bus)" : " (read-only)"}`),
+  );
   return server;
 }

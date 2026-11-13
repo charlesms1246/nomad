@@ -158,7 +158,9 @@ async function main() {
 
   startServer({
     port: +env("PORT", "8787"),
-    link: wsLink,
+    // PUBLIC=1: read-only API only (no /ws agent bus), for exposing /api/state to the hosted UI
+    link: env("PUBLIC", "0") === "1" ? undefined : wsLink,
+    host: env("PUBLIC", "0") === "1" ? "127.0.0.1" : undefined,
     log,
     state: () =>
       buildState({
