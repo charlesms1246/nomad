@@ -22,7 +22,7 @@ SWEEP ?= 1
 PORT ?= 8787
 TSX := pnpm exec tsx
 
-.PHONY: help install build test test-ts test-rust test-sandbox sim sim-serve dry-run ui live race fixtures kill-tests accounts fund fixture-accounts colo-check clean
+.PHONY: help install build test test-ts test-rust test-sandbox sim sim-serve dry-run ui live race fixtures race3 relayer-key kill-tests accounts fund fixture-accounts colo-check clean
 
 help:
 	@sed -n '1,14p' Makefile
@@ -72,6 +72,13 @@ live: build
 
 race: build
 	cd apps/matcher && RACE=1 PORT=$(PORT) $(TSX) src/cli-live.ts
+
+# 3-way race: + a matcher that submits as the Verifier through a delegated execute_intents key
+race3: build
+	cd apps/matcher && RACE=3 PORT=$(PORT) $(TSX) src/cli-live.ts
+
+relayer-key: build
+	cd apps/matcher && $(TSX) src/cli-relayer-key.ts
 
 # Fixture agents fx01..fx12 are separate from the live agents, so live trading never drains them.
 fixture-accounts: build

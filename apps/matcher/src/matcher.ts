@@ -53,8 +53,7 @@ export class Matcher {
     const fee = await this.chain.feePips();
     const now = this.now();
     // Skip offers about to expire: a leg's deadline must fit before its offer (and nonce) expires.
-    offers = offers.filter((o) => o.expiresAtMs > now + MIN_OFFER_LIFE_MS);
-    this.expiry = new Map(offers.map((o) => [o.id, o.expiresAtMs]));
+    offers = this.noteOffers(offers, now);
     const found = findRings(offers, {
       feePips: fee,
       maxLen: this.opts.maxLen ?? 5,
@@ -172,6 +171,13 @@ export class Matcher {
       }
     }
     return ui;
+  }
+
+  /** Drops offers about to expire and remembers expiries (ring deadlines are capped by them). */
+  noteOffers(offers: Offer[], now = this.now()): Offer[] {
+    const live = offers.filter((o) => o.expiresAtMs > now + MIN_OFFER_LIFE_MS);
+    this.expiry = new Map(live.map((o) => [o.id, o.expiresAtMs]));
+    return live;
   }
 
   private fail(ui: UiRing, r: FoundRing, error: string): UiRing {

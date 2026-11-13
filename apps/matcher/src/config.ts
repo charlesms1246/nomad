@@ -19,6 +19,7 @@ export interface NomadConfig {
   boardId?: string;
   matcherId?: string;
   controlMatcherId?: string;
+  relayerMatcherId?: string;
   feePips?: number;
   tokens: TokenCfg[];
 }
@@ -46,7 +47,7 @@ export function loadConfig(): NomadConfig {
 export const agentIds = (n: number, parent: string, prefix = process.env.AGENT_PREFIX ?? "a") =>
   Array.from({ length: n }, (_, i) => `${prefix}${String(i + 1).padStart(2, "0")}.${parent}`);
 
-export function readKey(accountId: string, kind: "intents" | "board") {
+export function readKey(accountId: string, kind: "intents" | "board" | "relayer") {
   const f = path.join(keysDir(), `${accountId}.${kind}.json`);
   const k = JSON.parse(fs.readFileSync(f, "utf8"));
   return { signerId: k.account_id as string, secretKey: k.private_key as string, publicKey: k.public_key as string };

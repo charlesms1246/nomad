@@ -24,7 +24,10 @@ import { SIM_TOKENS } from "./sim.js";
 import type { Ring as UiRing, RaceStats } from "./types.js";
 
 const env = (k: string, d: string) => process.env[k] ?? d;
-const RACE = env("RACE", "0") === "1";
+// RACE=1: Verifier-shard matcher vs other-shard matcher. RACE=3 adds a third matcher that submits
+// as the Verifier through a delegated execute_intents key (`make relayer-key`), like intents.near.
+const RACE_N = +env("RACE", "0");
+const RACE = RACE_N > 0;
 const ROUND_MS = +env("ROUND_MS", "6000");
 const MAX_ROUNDS = +env("MAX_ROUNDS", "0");
 const SEED = +env("SEED", "1");
@@ -109,7 +112,7 @@ async function main() {
     if (rings.length > 300) rings.length = 300;
     if (r.status === "settled" || r.status === "failed") fs.appendFileSync(ringLog, JSON.stringify({ at: new Date().toISOString(), ...r }) + "\n");
   };
-  const mk = (id: string) =>
+  const mk = (id: string, chain = chainFor(id)) =>
     new Matcher(
       {
         account: id,
@@ -130,16 +133,25 @@ async function main() {
           return { savingsBps: Math.round(mean * 10) / 10, savingsUsd: Math.round(usd * 10_000) / 10_000, quotedAtMs: Date.parse(bs[0]!.timestamp) };
         },
       },
-      chainFor(id),
+      chain,
       liveSigner({ signerId: id, secretKey: readKey(id, "intents").secretKey }),
       link,
     );
-  const prod = mk(prodId);
-  const ctrl = RACE ? mk(ctrlId) : null;
-  for (const [m, id] of [[prod, prodId], ...(ctrl ? [[ctrl, ctrlId]] : [])] as [Matcher, string][]) {
-    const c = await check({ account: id, target: cfg.verifierId }, { network: "testnet" });
+  // Delegated mode: the tx signer is the Verifier itself (a local receipt), through a key limited to execute_intents.
+  const relayerChain = () => {
+    const k = readKey(cfg.verifierId, "relayer");
+    return new LiveChain({ rpcUrl: cfg.rpcUrl, verifierId: cfg.verifierId }, { signerId: cfg.verifierId, secretKey: k.secretKey });
+  };
+  const relayerMatcherId = cfg.relayerMatcherId ?? `intents-matcher-1.${cfg.parent}`;
+  const SUBMIT_AS_VERIFIER = env("SUBMIT_AS", "") === "verifier";
+  const prod = mk(prodId, SUBMIT_AS_VERIFIER ? relayerChain() : chainFor(prodId));
+  const racers: { m: Matcher; label: string; txSigner: string }[] = [{ m: prod, label: prodId, txSigner: SUBMIT_AS_VERIFIER ? cfg.verifierId : prodId }];
+  if (RACE) racers.push({ m: mk(ctrlId), label: ctrlId, txSigner: ctrlId });
+  if (RACE_N >= 3) racers.push({ m: mk(relayerMatcherId, relayerChain()), label: `${relayerMatcherId} (signs as ${cfg.verifierId})`, txSigner: cfg.verifierId });
+  for (const { m, label, txSigner } of racers) {
+    const c = await check({ account: txSigner, target: cfg.verifierId }, { network: "testnet" });
     m.opts.shard = c.accountShard;
-    race.matchers.push({ account: id, shard: c.accountShard, colocated: c.colocated, wins: 0, blocksToExecHist: {} });
+    race.matchers.push({ account: label, shard: c.accountShard, colocated: c.colocated, wins: 0, blocksToExecHist: {} });
   }
 
   startServer({
@@ -233,17 +245,22 @@ async function main() {
         minLegUsd: 0.05,
         salt: `race:${round}`,
       });
+      for (const x of racers) x.m.noteOffers(book);
       for (const r of found) {
         race.rounds++;
-        const [a, b] = await Promise.all([prod.settle(r), ctrl!.settle({ ...r, ringId: r.ringId.slice(0, 63) + "c" } as FoundRing)]);
-        for (const [res, m] of [[a, race.matchers[0]!], [b, race.matchers[1]!]] as const) {
-          if (res.status === "settled") {
+        // every matcher gets the same ring at the same moment; agents sign each with the same per-offer nonce,
+        // so exactly one batch can execute and the rest fail with "nonce was already used"
+        const res = await Promise.all(racers.map((x, i) => x.m.settle(i === 0 ? r : ({ ...r, ringId: r.ringId.slice(0, 62) + "r" + i } as FoundRing))));
+        res.forEach((x, i) => {
+          const m = race.matchers[i]!;
+          if (x.status === "settled") {
             m.wins++;
-            if (res.blocksToExec !== null) m.blocksToExecHist[String(res.blocksToExec)] = (m.blocksToExecHist[String(res.blocksToExec)] ?? 0) + 1;
-            if (res.txHash) recordRing(res);
+            if (x.txHash) recordRing(x);
           }
-        }
-        log("race", { ring: r.ringId.slice(0, 12), prod: [a.status, a.blocksToExec], control: [b.status, b.blocksToExec] });
+          // blocks-to-execute counts every submitted batch, winner or not (both execute; the loser's panics)
+          if (x.blocksToExec !== null) m.blocksToExecHist[String(x.blocksToExec)] = (m.blocksToExecHist[String(x.blocksToExec)] ?? 0) + 1;
+        });
+        log("race", { ring: r.ringId.slice(0, 12), ...Object.fromEntries(res.map((x, i) => [racers[i]!.label.split(".")[0], [x.status, x.blocksToExec]])) });
       }
     }
     for (const a of agents.values()) {

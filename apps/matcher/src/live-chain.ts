@@ -50,7 +50,9 @@ export class LiveChain implements Chain {
   }
 
   async execute(signed: MultiPayload[], submitter: string): Promise<ExecResult> {
-    if (submitter !== this.submitter.signerId) throw new Error(`LiveChain holds the key of ${this.submitter.signerId}, not ${submitter}`);
+    // The tx is signed by this chain's submitter key: the matcher's own account, or (delegated mode)
+    // the Verifier account through a function-call key limited to execute_intents.
+    void submitter;
     try {
       const r = await this.client.execute(signed as never, this.submitter);
       const execHeight = r.receiptBlockHeights[0];
