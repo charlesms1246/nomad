@@ -15,7 +15,7 @@ import { NearRpc, signerFor, TESTNET_RPC } from "@nomad/intents";
 import { check } from "@nomad/colo";
 import { baseline, buildTokenMap, getTokens, type TokenSymbol } from "@nomad/oneclick";
 import { Matcher } from "./matcher.js";
-import { InProcessLink } from "./inprocess.js";
+import { InProcessLink, CompositeLink } from "./inprocess.js";
 import { LiveChain, liveSigner } from "./live-chain.js";
 import { WsLink, startServer } from "./server.js";
 import { buildState } from "./state.js";
@@ -99,8 +99,8 @@ async function main() {
       ),
     );
   });
-  const link = new InProcessLink(agents);
   const wsLink = new WsLink();
+  const link = new CompositeLink(agents, new InProcessLink(agents), wsLink);
 
   const rings: UiRing[] = [];
   const race: RaceStats = { rounds: 0, matchers: [] };

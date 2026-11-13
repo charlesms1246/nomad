@@ -17,3 +17,20 @@ export class InProcessLink implements AgentLink {
     this.agents.get(agent)?.onFailed(ringId);
   }
 }
+
+/** Routes to in-process agents first, then to agents connected over the bus. */
+export class CompositeLink implements AgentLink {
+  constructor(private local: Map<string, AgentRuntime>, private inproc: AgentLink, private remote: AgentLink) {}
+  private pick(agent: string) {
+    return this.local.has(agent) ? this.inproc : this.remote;
+  }
+  propose(agent: string, p: RingProposal) {
+    return this.pick(agent).propose(agent, p);
+  }
+  settled(agent: string, ringId: string, tx: string | null, leg: { offerId: string; giveAmt: bigint }) {
+    this.pick(agent).settled(agent, ringId, tx, leg);
+  }
+  failed(agent: string, ringId: string, error: string) {
+    this.pick(agent).failed(agent, ringId, error);
+  }
+}
