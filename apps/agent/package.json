@@ -23,9 +23,12 @@
   },
   "dependencies": {
     "@nomad/intents": "workspace:*",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "zod": "^3.25.0"
   },
   "bin": {
-    "nomad-agent": "dist/cli.js"
+    "nomad-agent": "dist/cli.js",
+    "nomad-mcp": "dist/mcp.js"
   }
 }

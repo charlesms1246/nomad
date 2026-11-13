@@ -10,12 +10,18 @@ importers:
 
   apps/agent:
     dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.32.0
+        version: 1.32.2(zod@3.25.76)
       '@nomad/intents':
         specifier: workspace:*
         version: link:../../packages/intents
       ws:
         specifier: ^8.18.0
         version: 8.23.0
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -128,6 +134,25 @@ importers:
       fast-check:
         specifier: ^3.22.0
         version: 3.23.2
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  packages/verifier-model:
+    dependencies:
+      '@nomad/intents':
+        specifier: workspace:*
+        version: link:../intents
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      tsx:
+        specifier: ^4.23.0
+        version: 4.23.15
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
