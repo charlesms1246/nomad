@@ -6,6 +6,7 @@ import {
   IntentsClient,
   NearRpc,
   TESTNET_RPC,
+  TESTNET_RPC_FALLBACKS,
   implicitAccountId,
   loadCredentials,
   randomKeyPair,
@@ -30,7 +31,7 @@ export const CONFIG = JSON.parse(
 };
 
 export const PARENT = CONFIG.tokenOwner;
-export const rpc = new NearRpc(process.env.NEAR_RPC ?? CONFIG.rpcUrl ?? TESTNET_RPC);
+export const rpc = new NearRpc(process.env.NEAR_RPC ?? CONFIG.rpcUrl ?? TESTNET_RPC, TESTNET_RPC_FALLBACKS);
 export const client = new IntentsClient({ rpc, verifierId: CONFIG.verifierId });
 export const parent = signerFor(PARENT);
 export const T = Object.fromEntries(CONFIG.tokens.map((t) => [t.symbol, t])) as Record<string, (typeof CONFIG.tokens)[number]>;

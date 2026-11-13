@@ -4,6 +4,8 @@ import { signTransaction, type Action } from './tx.js';
 
 export const TESTNET_RPC = 'https://rpc.testnet.fastnear.com';
 export const MAINNET_RPC = 'https://rpc.mainnet.fastnear.com';
+/** Public testnet endpoints that responded on 2026-11-14, used as fallbacks. */
+export const TESTNET_RPC_FALLBACKS = ['https://test.rpc.fastnear.com', 'https://near-testnet.drpc.org', 'https://rpc.testnet.near.org'];
 
 export class RpcError extends Error {
   constructor(message: string, readonly data?: unknown) {
@@ -42,13 +44,24 @@ export class NearRpc {
   private nonces = new Map<string, bigint>();
   private blockHeights = new Map<string, number>();
 
-  constructor(readonly url: string = TESTNET_RPC) {}
+  private urls: string[];
+  private cur = 0;
+
+  /**
+   * @param url primary RPC endpoint
+   * @param fallbacks endpoints to rotate to on HTTP 429/5xx or network errors
+   *   (env NEAR_RPC_FALLBACKS, comma-separated, is appended)
+   */
+  constructor(readonly url: string = TESTNET_RPC, fallbacks: string[] = []) {
+    const env = (globalThis.process?.env?.NEAR_RPC_FALLBACKS ?? '').split(',').filter(Boolean);
+    this.urls = [...new Set([url, ...fallbacks, ...env])];
+  }
 
   async call<T = any>(method: string, params: unknown, retries = 6): Promise<T> {
     let lastErr: unknown;
     for (let i = 0; i <= retries; i++) {
       try {
-        const r = await fetch(this.url, {
+        const r = await fetch(this.urls[this.cur % this.urls.length]!, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 'nomad', method, params }),
@@ -67,6 +80,10 @@ export class NearRpc {
       } catch (e: any) {
         lastErr = e;
         if (e?.fatal) throw e;
+        if (this.urls.length > 1 && /HTTP|fetch failed/.test(String(e?.message))) {
+          this.cur++; // rotate to the next endpoint; retry immediately once per endpoint
+          if (i < this.urls.length - 1) continue;
+        }
         await sleep(Math.min(8000, 300 * 2 ** i));
       }
     }
@@ -134,7 +151,7 @@ export class NearRpc {
       } catch (e: any) {
         const msg = String(e.message);
         if (attempt < 3 && /InvalidNonce|Expired/.test(msg)) continue;
-        if (/TIMEOUT_ERROR|HTTP 5|fetch failed/.test(msg)) {
+        if (/TIMEOUT_ERROR|HTTP 5|HTTP 429|fetch failed/.test(msg)) {
           res = await this.waitTx(txHash, signer.signerId, 120_000, b64encode(signed));
         } else throw e;
       }
