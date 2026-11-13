@@ -50,3 +50,23 @@ export function readKey(accountId: string, kind: "intents" | "board") {
   const k = JSON.parse(fs.readFileSync(f, "utf8"));
   return { signerId: k.account_id as string, secretKey: k.private_key as string, publicKey: k.public_key as string };
 }
+
+/**
+ * Demo inventory plan: what each agent holds and wants. Chosen so that loops of 3, 4 and 5
+ * exist (a01-a03: ZEC->USDC->wNEAR; a04-a07: ZEC->USDT->USDC->wNEAR; a08-a12: BTC->USDT->USDC->wNEAR->ZEC)
+ * and no two agents want each other's token (pairs alone can't clear the 3-ring).
+ */
+export const AGENT_PLAN: { hold: string; want: string; usd: number }[] = [
+  { hold: "ZEC", want: "USDC", usd: 3 },
+  { hold: "USDC", want: "wNEAR", usd: 3 },
+  { hold: "wNEAR", want: "ZEC", usd: 3 },
+  { hold: "ZEC", want: "USDT", usd: 3 },
+  { hold: "USDT", want: "USDC", usd: 3 },
+  { hold: "USDC", want: "wNEAR", usd: 3 },
+  { hold: "wNEAR", want: "ZEC", usd: 3 },
+  { hold: "BTC", want: "USDT", usd: 3 },
+  { hold: "USDT", want: "USDC", usd: 3 },
+  { hold: "USDC", want: "wNEAR", usd: 3 },
+  { hold: "wNEAR", want: "ZEC", usd: 3 },
+  { hold: "ZEC", want: "BTC", usd: 3 },
+];

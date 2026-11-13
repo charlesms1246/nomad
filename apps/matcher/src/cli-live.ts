@@ -19,7 +19,7 @@ import { InProcessLink, CompositeLink } from "./inprocess.js";
 import { LiveChain, liveSigner } from "./live-chain.js";
 import { WsLink, startServer } from "./server.js";
 import { buildState } from "./state.js";
-import { loadConfig, agentIds, readKey, repoRoot } from "./config.js";
+import { loadConfig, agentIds, readKey, repoRoot, AGENT_PLAN } from "./config.js";
 import { SIM_TOKENS } from "./sim.js";
 import type { Ring as UiRing, RaceStats } from "./types.js";
 
@@ -28,7 +28,7 @@ const RACE = env("RACE", "0") === "1";
 const ROUND_MS = +env("ROUND_MS", "6000");
 const MAX_ROUNDS = +env("MAX_ROUNDS", "0");
 const SEED = +env("SEED", "1");
-const STRATS: StrategyName[] = ["spender", "collector", "rebalancer", "spender"];
+const STRATS: StrategyName[] = ["spender"];
 const log = (m: string, x?: object) => console.log(new Date().toISOString(), m, x ? JSON.stringify(x) : "");
 
 async function main() {
@@ -87,7 +87,7 @@ async function main() {
         {
           id,
           strategy,
-          target: tokens[(i * 2 + 1) % tokens.length]!.id,
+          target: tokens.find((t) => t.symbol === AGENT_PLAN[i % AGENT_PLAN.length]!.want)?.id ?? tokens[(i * 2 + 1) % tokens.length]!.id,
           margin: 0.002 + rng() * 0.012,
           sizeFrac: 0.4 + rng() * 0.4,
           ttlMs: 10 * 60_000,

@@ -22,7 +22,7 @@ SWEEP ?= 1
 PORT ?= 8787
 TSX := pnpm exec tsx
 
-.PHONY: help install build test test-ts test-rust sim sim-serve dry-run ui live race fixtures kill-tests accounts colo-check clean
+.PHONY: help install build test test-ts test-rust sim sim-serve dry-run ui live race fixtures kill-tests accounts fund colo-check clean
 
 help:
 	@sed -n '1,14p' Makefile
@@ -58,6 +58,9 @@ ui:
 
 accounts: build
 	cd apps/matcher && $(TSX) src/cli-accounts.ts
+
+fund: build
+	cd apps/matcher && $(TSX) src/cli-fund.ts
 
 live: build
 	cd apps/matcher && PORT=$(PORT) $(TSX) src/cli-live.ts
