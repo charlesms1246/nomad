@@ -28,9 +28,11 @@ Agents that hold different tokens trade in **rings** (A wants B's token, B wants
 - EVM users can also submit an EIP-712 order (the ERC-7683 earlier-draft `GaslessCrossChainOrder`) with `submit_order`. The contract checks it with `ecrecover` and enforces its minimum price on every ring that includes that wallet.
 - **Measured:** a stranger account (`k4`) closed a ring whose three legs were signed in **three different standards**: [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR). Details are in [Measurements](#measurements).
 
-**Mandates (v2, `contracts/mandate`, in progress).** An owner sets limits on chain. The contract then requests a leg signature from NEAR's MPC signer (Chain Signatures, `v1.signer-prod.testnet`) for an `erc191` leg.
-- K-c passed: the MPC-signed leg was accepted by `simulate_intents`.
-- It has not settled in a ring yet.
+**On-chain mandates (v2, `contracts/mandate`, verified on chain).** `mandate.nomadswarm.testnet` controls an MPC-derived Ethereum-style account, `0x991543dd33bcf06563cd14a67decf1834fe6bf9b`. No hot key signs that account's legs.
+- For each leg, the contract checks the owner's limits on chain: allowed tokens, the maximum per leg, a daily budget and a minimum price.
+- It then asks NEAR's MPC signer (Chain Signatures, `v1.signer-prod.testnet`) for an `erc191` signature and checks the result with `ecrecover` before storing it.
+- **Measured:** a ring of that MPC-signed leg plus a05's `nep413` leg was closed by the stranger `k4` and settled [`2WgJbhRW…`](https://testnet.nearblocks.io/txns/2WgJbhRWZJhy38nCxSLeb2FPXCN4SaX9TmvhakBcPrr9). A leg below the minimum price and one over the daily budget were refused.
+- See [docs/MANDATE.md](docs/MANDATE.md).
 
 **Off-chain proposer mode (v1, `apps/matcher`).** Matchers find rings off chain and send proposals to agents over a websocket bus.
 - Each agent checks a proposal with `legCheck` and signs it. The matcher adds its fee leg and submits the batch.
@@ -56,7 +58,7 @@ Everything in that list, Nomad also does or now does. Fee competition between ma
 | Who submits the settlement | The scout that won, from its own account | v1: the matcher. v2: **any account** calls `close_ring`; the contract makes the `execute_intents` call and pays the closer the agents' tips |
 | Fee competition | Yes: scouts compete on tip | v1: yes (`make fee-race`, 3 matchers we run). v2: tips are set by the agents; there's no matcher cut |
 | Wallet standards in a ring | NEP-413 | `nep413`, `erc191` and `raw_ed25519` in **one** settled ring; EIP-712 orders (ERC-7683 earlier draft) verified on chain with `ecrecover` |
-| Mandates | Off chain: NEAR AI reads plain-English orders | Off chain: `legCheck`, optional LLM margin. On chain (in progress): `contracts/mandate` gets MPC signatures for legs; one leg passed `simulate_intents` |
+| Mandates | Off chain: NEAR AI reads plain-English orders | Off chain: `legCheck`, optional LLM margin. **On chain:** `contracts/mandate` enforces limits (tokens, per-leg max, daily budget, minimum price) and gets MPC signatures; a mandate-signed leg settled in a ring |
 | Reputation | Not mentioned in its README | On-chain counters in `contracts/rings` (rings settled, rings closed, failed closes) |
 | 1Click floor / fallback | Real quote floors, and the fallback is taken | Quotes as the baseline; the fallback is refused on testnet by design |
 | Read-only mainnet `simulate_intents` proof | Yes | Yes (`make mainnet-proof`) |
@@ -134,7 +136,7 @@ What `make mainnet-proof` shows, and no more:
 | v2 on-chain closer: `propose_ring`, `attach_leg`, permissionless `close_ring` (cross-contract `execute_intents`, tips paid to the closer with `mt_transfer`), reputation counters, ERC-7683 order ingress | [contracts/rings/src](contracts/rings/src) | `cd contracts/rings && cargo test` (16 tests, including the ERC-7683 golden vector and `ecrecover`); ERC-7683 on chain: [rings-order-e2e.json](docs/measurements/rings-order-e2e.json); on chain: [scripts/rings-e2e.ts](scripts/rings-e2e.ts), [scripts/rings-multiwallet.ts](scripts/rings-multiwallet.ts) |
 | Wallet standards: `erc191` and `raw_ed25519` signers | [packages/intents/src/standards.ts](packages/intents/src/standards.ts) | [standards.test.ts](packages/intents/test/standards.test.ts) (vectors from near/intents and web3.js); K-a on chain ([scripts/k-a-multiwallet.ts](scripts/k-a-multiwallet.ts)) |
 | ERC-7683 (earlier draft) `GaslessCrossChainOrder`, EIP-712 digest and signature | [packages/intents/src/erc7683.ts](packages/intents/src/erc7683.ts) | [erc7683.test.ts](packages/intents/test/erc7683.test.ts); golden vector [erc7683-vector.json](packages/intents/test/fixtures/erc7683-vector.json), checked against viem 2.57.19 and loaded by the Rust tests |
-| On-chain mandates with MPC signatures (in progress) | [contracts/mandate/src](contracts/mandate/src) | `cd contracts/mandate && cargo test` (14 tests); K-c ([scripts/k-c-mandate.ts](scripts/k-c-mandate.ts)) |
+| On-chain mandates with MPC signatures (Chain Signatures) | [contracts/mandate/src](contracts/mandate/src), [docs/MANDATE.md](docs/MANDATE.md) | `cd contracts/mandate && cargo test` (14 tests); on chain: [scripts/k-c-mandate.ts](scripts/k-c-mandate.ts), [scripts/mandate-e2e.ts](scripts/mandate-e2e.ts), [rings-mandate-e2e.json](docs/measurements/rings-mandate-e2e.json) |
 | Offer board (rules in [RULES.md](RULES.md)) | [contracts/board/src/lib.rs](contracts/board/src/lib.rs) | `make test-rust` (40 unit tests); `make test-sandbox` (near-workspaces, needs cargo-near) |
 | 1Click baseline and guarded fallback | [packages/oneclick/src](packages/oneclick/src) | [packages/oneclick/test](packages/oneclick/test). The fallback refuses to run on testnet by design: `1Click fallback is mainnet-only; refusing on testnet` ([fallback.ts](packages/oneclick/src/fallback.ts)) |
 | LLM mode (NEAR AI Cloud sets an agent's margin; `legCheck` still decides every signature) | [apps/agent/src/llm.ts](apps/agent/src/llm.ts) | [llm.test.ts](apps/agent/test/llm.test.ts) against a mocked API, including clamping to [0, 5%]. Not run against the live API: it needs `LLM=1 NEARAI_API_KEY=…`, and we had no key |
@@ -152,7 +154,7 @@ What `make mainnet-proof` shows, and no more:
 | Prices and the 1Click baseline | Live mainnet 1Click dry quotes (read-only, no funds) | The sim uses one fixed baseline quote (−49 bps on 2026-11-13) |
 | Agents | `a01`–`a12.nomadswarm.testnet`, each with its own Verifier key | Sim agents are in-process |
 | Fallback execution through 1Click | Refused on testnet by design (1Click is mainnet-only) | Quotes only |
-| On-chain mandates | The MPC signer (`v1.signer-prod.testnet`) signed a leg requested by `contracts/mandate`, and `simulate_intents` accepted it | That leg has not settled in a ring |
+| On-chain mandates | The mandate contract checked the limits, the MPC network signed, and the leg settled in a ring closed by a stranger. The below-price and over-budget requests were refused on chain | One mandate, one owner, scripted requests |
 | ERC-7683 orders | A fresh Ethereum wallet's EIP-712 order was verified on chain, enforced and partly filled ([rings-order-e2e.json](docs/measurements/rings-order-e2e.json)) | One test wallet, scripted |
 | LLM mode | Coded and unit-tested against a mocked API | Not run against the live NEAR AI Cloud API |
 | UI | Reads the matcher's `/api/state` (badge LIVE). With no reachable matcher, a recorded real testnet state from 2026-11-13 23:53 UTC ([web/lib/live-snapshot.json](web/lib/live-snapshot.json)), labelled as recorded | With `make sim-serve`, simulated state labelled Simulation. `?mock=1` serves an invented layout fixture for UI development only |
@@ -206,10 +208,20 @@ All of these are in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md), with tx hashes
   - A ring that paid the wallet less than its minimum price was **rejected** by `propose_ring`: `leg 0 pays less than order …'s minimum price` [`GvZcdEY5…`](https://testnet.nearblocks.io/txns/GvZcdEY5LPHfxxJ6M67ijEyVPhAbwE9ZrFdAZaLHXzFF).
   - A ring at its price, with the wallet's `erc191` leg and two `nep413` agents (a03, a01), was closed by the stranger `k4` and settled [`D6YZJqgr…`](https://testnet.nearblocks.io/txns/D6YZJqgrEVXXNVLahodBycyBBqNV1RnwnY6ptAyCRhCK).
   - The order now shows 399,495 of 1,000,000 filled.
-- **v2, MPC mandate** (K-c, [mandate.json](docs/measurements/mandate.json)):
-  - `mandate.nomadswarm.testnet` requested an `erc191` leg signature from `v1.signer-prod.testnet` for its derived address `0x9915…bf9b` [`FnMcqifQ…`](https://testnet.nearblocks.io/txns/FnMcqifQZEMRrSjnK5xY7j5nrNzuwvx2MxfBQt3FPtCY), which took 8.8 s.
-  - `simulate_intents` accepted the signed leg against a counter-leg.
-  - It was not settled.
+- **v2, a ring leg signed by an on-chain mandate through Chain Signatures** ([rings-mandate-e2e.json](docs/measurements/rings-mandate-e2e.json), [mandate.json](docs/measurements/mandate.json)):
+  - A 2-agent ring on `rings.nomadswarm.testnet` contained:
+    - the mandate's `erc191` leg for `0x9915…bf9b` (150,000 USDC → 149,999 USDT, plus a 100 tip). The MPC signature was requested in [`J89CLaPP…`](https://testnet.nearblocks.io/txns/J89CLaPPRsbuQ4nNqXTqdNXJnXu8GmzZcvjFWxqUkW7A) and took 9.2 s;
+    - a05's `nep413` leg.
+  - `k4` closed it, and it settled: [`2WgJbhRW…`](https://testnet.nearblocks.io/txns/2WgJbhRWZJhy38nCxSLeb2FPXCN4SaX9TmvhakBcPrr9).
+  - Refused on chain:
+    - `mandate: below min price: get 90000 for give 100000 < 99/100` [`GJXuiUZF…`](https://testnet.nearblocks.io/txns/GJXuiUZF1HvDVbCjMp49fDRhrK8JLYAj5LMmJrNSbPUg);
+    - `over daily budget: spent 400200 + 160000 > 550100` [`Ht9SdVao…`](https://testnet.nearblocks.io/txns/Ht9SdVaozyEKSoYtAU398TVNaZM7JfEUe6rcvQhQk8DU).
+  - Earlier, K-c: the first MPC-signed leg passed `simulate_intents` [`FnMcqifQ…`](https://testnet.nearblocks.io/txns/FnMcqifQZEMRrSjnK5xY7j5nrNzuwvx2MxfBQt3FPtCY).
+  - Limits:
+    - each signature costs about 0.01 NEAR and about 9 s;
+    - the budget is charged at signing, not at settlement, so a leg that never settles still uses budget;
+    - `min_counterparty_reputation` is stored but not enforced;
+    - the mandate contract and the MPC network are trusted.
 - **Read-only mainnet proof:** `make mainnet-proof`, described [above](#try-it-no-keys-no-funds).
 - **36-minute live run** (2026-11-14, 00:35–01:11 UTC, 12 agents, one matcher at φ = 0.2, `SUBMIT_AS=verifier AUTO_FUND=10 make live`; [live-30min.json](docs/measurements/live-30min.json)):
   - **27 rings settled, 0 failed** (k = 3: 4, k = 4: 17, k = 5: 6), each in one `execute_intents` call;
@@ -231,7 +243,7 @@ All on NEAR testnet. Explorer: `https://testnet.nearblocks.io/txns/<hash>`.
 | Verifier fee collector (1 pip) | `fees.nomadswarm.testnet` | A balance inside the Verifier only; no on-chain account is needed (K6) |
 | Test tokens | `wnear`, `usdc`, `usdt`, `btc`, `zec` `.nomadswarm.testnet` | [config/testnet.json](config/testnet.json) |
 | v2 rings contract | `rings.nomadswarm.testnet` | Deploy [`2oibk3eW…`](https://testnet.nearblocks.io/txns/2oibk3eWFUpRa41LYZsVWbt2wYvDgjM1jc3AttGsi5Nk); redeploy + `migrate` adding ERC-7683 orders and chain id 398 [`Da5jvvVP…`](https://testnet.nearblocks.io/txns/Da5jvvVPxu9nH8h6xXcoB9ZQv5y72HC8ABpuU1QiWAnx); stranger closes [`85Emngj6…`](https://testnet.nearblocks.io/txns/85Emngj6B4q8EqSjAWShfPbMYSfrGstE9RnYJwrhVQdc), [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR) |
-| v2 mandate contract | `mandate.nomadswarm.testnet` | Deploy [`APaeBU6Z…`](https://testnet.nearblocks.io/txns/APaeBU6ZkLpWzoWN16yz5ELZeuY6FWV9sVLkqEMRHdzw); MPC leg request [`FnMcqifQ…`](https://testnet.nearblocks.io/txns/FnMcqifQZEMRrSjnK5xY7j5nrNzuwvx2MxfBQt3FPtCY) |
+| v2 mandate contract | `mandate.nomadswarm.testnet` | Deploy [`APaeBU6Z…`](https://testnet.nearblocks.io/txns/APaeBU6ZkLpWzoWN16yz5ELZeuY6FWV9sVLkqEMRHdzw); MPC leg request [`FnMcqifQ…`](https://testnet.nearblocks.io/txns/FnMcqifQZEMRrSjnK5xY7j5nrNzuwvx2MxfBQt3FPtCY); mandate-signed leg settled in ring [`2WgJbhRW…`](https://testnet.nearblocks.io/txns/2WgJbhRWZJhy38nCxSLeb2FPXCN4SaX9TmvhakBcPrr9) |
 | Offer board (v1) | `board.nomadswarm.testnet` | Create + deploy + `new`: [`qrQaozvX…`](https://testnet.nearblocks.io/txns/qrQaozvXXHwSMUkLfmWwzNQhaoNUZjW4pWpfD5mVxDX) ([scripts/deploy-board.mjs](scripts/deploy-board.mjs)); `add_matcher`: [`9xFg3fgs…`](https://testnet.nearblocks.io/txns/9xFg3fgsTMbxUKfGixus5fKoHx7wLBMgTiXsA3FuhyiN), [`7EvwrQXX…`](https://testnet.nearblocks.io/txns/7EvwrQXXXS78PW8cQ5N4xB5wzF4r6hffHUGXi93YLCqV) |
 | Matcher, signing as the Verifier (relayer key, `execute_intents` only) | `intents-matcher-1.nomadswarm.testnet` | Relayer key `AddKey`: [`EytNTDhc…`](https://testnet.nearblocks.io/txns/EytNTDhc8KSSJ6XeT8CE2maSdNxwG3vkF1kfRuBRtUsg). 3-way race winner: [`B3nwWbx8…`](https://testnet.nearblocks.io/txns/B3nwWbx8dptDiVobQpfuaq1h9xVrDh6gXyp9iAVTyKPg) (0 blocks) |
 | Matcher on the Verifier's shard (7) | `intents-matcher.nomadswarm.testnet` | Created [`3DNE9SS8…`](https://testnet.nearblocks.io/txns/3DNE9SS8LoDCkpK8sZZX7eRspBsS88y6VMySv73h5yde); [`DqhyqX6n…`](https://testnet.nearblocks.io/txns/DqhyqX6n2aG735hN51HSbSA13xraqP52JKGnZrs19GJ5) (lost the race, 1 block) |
