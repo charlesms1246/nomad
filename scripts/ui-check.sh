@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local UI check against a dev instance (never the deployed UI): starts the sim matcher on
 # $SIM_PORT, a web/ dev server on $UI_PORT pointed at it, checks /api/state through the UI's proxy,
-# and saves a headless screenshot to out/ui-check.png. Usage: make ui-check [MATCHER_URL=...]
+# and saves a headless screenshot to out/ui-check/ui.png. Usage: make ui-check [MATCHER_URL=...]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SIM_PORT="${SIM_PORT:-8791}"; UI_PORT="${UI_PORT:-3091}"
