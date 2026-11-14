@@ -4,7 +4,10 @@
 
 Tracks: **AI Swarms** and **DeFi**.
 
-**Live UI:** https://nomad-swarm.vercel.app is the dashboard. With no live matcher behind it, it shows recorded real testnet data labelled as such. https://nomad-swarm.vercel.app/v2?verify=1 shows the v2 rings, each re-checked on chain in your browser.
+**Live UI:**
+- https://nomad-swarm.vercel.app is the landing page. It replays a real three-wallet ring (`f5d3e16f…`), step by step from proposal to tips, read from testnet in your browser.
+- https://nomad-swarm.vercel.app/dashboard is the v1 matcher dashboard. With no live matcher behind it, it shows recorded real testnet data, labelled as such.
+- https://nomad-swarm.vercel.app/v2?verify=1 shows the v2 rings, each re-checked on chain in your browser.
 
 **Network: NEAR testnet only.** `intents.near` exists only on mainnet. Our testnet Verifier `intents.nomadswarm.testnet` runs **mainnet `intents.near`'s exact wasm**: the code hash is `BtA1BEFNS619KkvXFsgcpQ21Tb5yMm32aaUkn7xNothk` on both. Mainnet is used only for read-only view calls (`simulate_intents`, 1Click dry quotes). Every figure below comes with its tx hash as a NearBlocks link, so it can be checked on chain without anything else from us.
 
@@ -105,7 +108,7 @@ Output below was captured from this repo on 2026-11-14.
 | 2 | `make dry-run` | `ring-3.json: simulate_intents on intents.nomadswarm.testnet: 4 intents_executed (3 agents + matcher)`, then the same for ring-4 (5) and ring-5 (6). This is a read-only call to our testnet Verifier with committed signed fixtures |
 | 3 | `make mainnet-proof` | `ring (3 agents), leg 1 first: insufficient balance or overflow` (and the same for legs 2 and 3), then `control: corrupted signature: invalid signature` and `control: zero salt: invalid salt`. This is read-only `simulate_intents` on **mainnet `intents.near`** |
 | 4 | `make test` | Each TypeScript package reports `Tests N passed` (live-network tests are skipped). Then the Rust tests: the board `test result: ok. 40 passed`, the v2 rings contract `16 passed` (including the ERC-7683 golden vector and `ecrecover`) and the mandate contract `14 passed` |
-| 5 | `cd web && npm install && npm run dev` | The UI at http://localhost:3000. With no reachable `MATCHER_URL`, it shows a recorded real testnet state (a 3-way race capture, with real tx links) labelled **Recorded testnet data · 2026-11-13 23:53 UTC**. `make sim-serve` plus `make ui` shows a running simulation, labelled **Simulation**. `MATCHER_URL=http://localhost:1 make ui-check` prints `ui-check: source=recorded agents=12 rings=18 settled=6` |
+| 5 | `cd web && npm install && npm run dev`, then open http://localhost:3000 and http://localhost:3000/dashboard | `/` is the landing page. It replays the real three-wallet ring `f5d3e16f…` (proposed, legs attached per wallet, closed by the stranger `k4`, settled, tips, reputation), read from testnet RPC in the browser, with a saved copy ([web/lib/replay-fallback.json](web/lib/replay-fallback.json)) if RPC is unreachable. `/dashboard` is the v1 matcher dashboard. With no reachable `MATCHER_URL`, it shows a recorded real testnet state (a 3-way race capture, with real tx links) labelled **Recorded testnet data · 2026-11-13 23:53 UTC**. `make sim-serve` plus `make ui` shows a running simulation, labelled **Simulation**. `MATCHER_URL=http://localhost:1 make ui-check` prints `ui-check: source=recorded agents=12 rings=18 settled=6`, then saves screenshots of `/dashboard`, `/` and `/v2` to `out/ui-check/`. Stop any running `web/` dev server first; otherwise it exits with "stop your web dev server first" |
 | 6 | `cd web && npm run dev`, then open http://localhost:3000/v2?verify=1 | The v2 rings, read from `rings.nomadswarm.testnet` straight from testnet RPC in the browser. Each ring shows its legs' wallet standards and a "closed by a stranger" badge, and there's a reputation table. With `?verify=1`, each closed ring is re-checked on chain on load and shows, for example, `Verified on chain: k4 (not one of the agents) called close_ring in block 277,670,820. The contract's execute_intents ran in block 277,670,822 (2 blocks later, one cross-contract hop), status SuccessValue, settling 3 legs in 3 wallet standards.` We checked all 4 closed rings this way in a headless browser on 2026-11-14. Hosted: https://nomad-swarm.vercel.app/v2?verify=1 |
 | 7 | Testnet proof | The tx links under [Deployments](#deployments) |
 
@@ -147,7 +150,8 @@ What `make mainnet-proof` shows, and no more:
 | Signed fixtures for `make dry-run` | [fixtures/rings](fixtures/rings), signed by `make fixtures` | Signed by dedicated agents `fx01`–`fx12` (`make fixture-accounts`), so live trading never drains them |
 | (Research appendix) House of Stake spend budgets | [scripts/hos-budget.ts](scripts/hos-budget.ts), [contracts/hos/build.sh](contracts/hos/build.sh) | [Research appendix](#house-of-stake-spend-budgets) |
 | UI `/v2`: reads the rings contract from testnet RPC in the browser; wallet badge per leg, stranger-closer badge, reputation table, "Re-check the close on chain" (follows `close_ring` → `execute_intents` and compares every signed leg with the executed `token_diff` and the tips paid) | [web/app/v2](web/app/v2), [web/components/V2Rings.tsx](web/components/V2Rings.tsx) | `/v2?verify=1` re-checks every closed ring on load |
-| UI: ring graph, rings table, swarm and race panels | [web/components](web/components), API shape in [web/lib/types.ts](web/lib/types.ts) | `cd web && npx next build`; `make ui-check` (sim matcher + local dev UI + headless screenshot to `out/ui-check/ui.png`) |
+| UI landing page `/`: replay of the real three-wallet ring, marquee of recent rings, three figures read from the rings contract's `config()` | [web/app/page.tsx](web/app/page.tsx), saved copy [web/lib/replay-fallback.json](web/lib/replay-fallback.json) | `make ui-check` (landing screenshots, including reduced motion) |
+| UI `/dashboard` (v1): ring graph, rings table, swarm and race panels | [web/components](web/components), API shape in [web/lib/types.ts](web/lib/types.ts) | `cd web && npx next build`; `make ui-check` (sim matcher + local dev UI + headless screenshots of `/dashboard`, `/` and `/v2` at 1440 and 390 px, in `out/ui-check/`) |
 | Matcher container (read-only public API) | [apps/matcher/Dockerfile](apps/matcher/Dockerfile), [apps/matcher/src/server.ts](apps/matcher/src/server.ts) | [Deploy notes](#deploy-notes): with `PUBLIC=1`, only `GET /api/state` and `/healthz` are served |
 
 ## What is real vs simulated
@@ -370,14 +374,15 @@ Known limits:
 ## Demo
 
 What the video shows, and how to reproduce it:
-1. **The 60-second replay:** `cd web && npm run dev`, then open http://localhost:3000/?demo=1 (**d** starts or stops it, **c** toggles captions). The timeline is in [web/lib/demo.ts](web/lib/demo.ts):
+1. **The 60-second replay:** `cd web && npm run dev`, then open http://localhost:3000/dashboard?demo=1 (**d** starts or stops it, **c** toggles captions; `?captions=0` hides them). The timeline is in [web/lib/demo.ts](web/lib/demo.ts):
    - agents on a circle, none of which can trade in pairs;
    - a loop appears, and each agent signs its own leg;
    - `simulate_intents`, then one `execute_intents`;
    - the real tx hash of the newest settled 3-agent ring.
-2. **v2:** http://localhost:3000/v2?verify=1. Each ring is re-checked on chain, with the stranger closer and the wallet standards shown.
-3. **No-key checks:** `make dry-run` (signed fixtures pass `simulate_intents`) and `make mainnet-proof` (our signatures reach mainnet `intents.near`'s balance check).
-4. **The failure case:** attack A1 above. One agent spends first, the whole ring fails, and nothing moves.
+2. **The landing page:** http://localhost:3000 replays the three-wallet ring from proposal to tips.
+3. **v2:** http://localhost:3000/v2?verify=1. Each ring is re-checked on chain, with the stranger closer and the wallet standards shown.
+4. **No-key checks:** `make dry-run` (signed fixtures pass `simulate_intents`) and `make mainnet-proof` (our signatures reach mainnet `intents.near`'s balance check).
+5. **The failure case:** attack A1 above. One agent spends first, the whole ring fails, and nothing moves.
 
 Rules for anything said in the video:
 - say "testnet";
