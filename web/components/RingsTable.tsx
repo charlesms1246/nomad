@@ -3,6 +3,7 @@
 import type { NomadState, Ring } from "@/lib/types";
 import { STATUS, fmtBps, fmtUsd, shortAgent, sym, type TokenIndex } from "@/lib/format";
 import { TxLink } from "./RingDetail";
+import { RecheckButton } from "./OnChainCheck";
 
 const STATUS_STYLE: Record<Ring["status"], { c: string; icon: string }> = {
   proposed: { c: "#c3c2b7", icon: "…" },
@@ -87,6 +88,9 @@ export default function RingsTable({
                   <td className="px-3 py-2 text-right font-mono text-[#c3c2b7]">{fmtUsd(r.savingsUsd)}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <TxLink state={state} hash={r.txHash} n={6} />
+                    <div className="mt-0.5">
+                      <RecheckButton state={state} ring={r} onSelect={onSelect} />
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-[#f0efec]">{r.blocksToExec ?? "—"}</td>
                 </tr>

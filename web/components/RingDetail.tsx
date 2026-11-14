@@ -1,6 +1,7 @@
 "use client";
 
 import type { NomadState, Ring } from "@/lib/types";
+import { OnChainPanel } from "./OnChainCheck";
 import { STATUS, fmtAmt, fmtBps, fmtTime, fmtUsd, shortAgent, shortHash, type TokenIndex } from "@/lib/format";
 
 const STEPS: { key: Ring["status"]; label: string }[] = [
@@ -115,6 +116,7 @@ export default function RingDetail({ state, ix, ring, highlightSavings }: { stat
           <dd className="text-right font-mono text-[#f0efec]">{ring.gasBurntTgas != null ? `${ring.gasBurntTgas} Tgas` : "—"}</dd>
         </dl>
         {ring.error && <p className="mt-3 rounded-md bg-[#d03b3b]/10 px-3 py-2 text-xs text-[#e66767]">✕ {ring.error}</p>}
+        <OnChainPanel state={state} ix={ix} ring={ring} />
       </div>
 
       <div

@@ -40,7 +40,7 @@ export function fmtNum(n: number): string {
   const a = Math.abs(n);
   if (a >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
   if (a >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
-  return n.toPrecision(4).replace(/0+$/, "").replace(/\.$/, "");
+  return n.toLocaleString("en-US", { maximumSignificantDigits: 4, maximumFractionDigits: 20 });
 }
 
 export function fmtAmt(ix: TokenIndex, id: TokenId, amt: string): string {
