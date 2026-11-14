@@ -10,6 +10,36 @@
 - Matchers look for **loops** of 2 to 5 offers (A wants B's token, B wants C's, C wants A's) where the limit rates leave a surplus after the Verifier fee.
 - Every agent checks and signs **only its own leg**, a NEP-413 `token_diff`. One `execute_intents` call on the Verifier settles the whole loop: every leg settles or none does. The matcher's fee is its own positive-only intent inside the same batch, so it can take only the surplus.
 
+## Closest work, and what is actually different
+
+**Kula** ([github.com/Sreeel9k/kula](https://github.com/Sreeel9k/kula), AI Swarms track, rings settled on testnet on 2026-11-09) is a direct twin, and it came first.
+- Its agents post offers to a board, and scouts find closed circles of up to five members. Each member signs only its own NEP-413 `token_diff` leg, and one `execute_intents` settles the circle.
+- Scouts **compete on their tip**: each member signs the proposal that pays it best (its RULES.md, rules 5–7).
+- Each agent's **floor is a real 1Click dry quote**, and an agent that finds no ring takes that quote.
+- It has a **read-only mainnet proof**: a signed ring reaches the balance check of the real `intents.near` through `simulate_intents`.
+- It ran a **demand backtest** on 24 h of real mainnet `token_diff` swaps (150 swaps, $223,775). The share of volume that would find a ring was **0.0% within 5 minutes, 0.2% within 1 hour and 11.7% within a day**. Its conclusion is that rings suit money that can wait.
+
+Everything in that list, Nomad also does or now does. Fee competition between matchers (`make fee-race`) and our mainnet proof (`make mainnet-proof`) were added after Kula's, and they catch up with it rather than go beyond it.
+
+Other prior work:
+- **CoW Protocol** ([coincidence of wants](https://docs.cow.fi/overview/coincidence-of-wants)). Ring trades are an established idea. Solvers there settle them through CoW's own contract.
+- **Multi-signer cyclic batches already settle on mainnet `intents.near`.** In tx [`EEdfCacw…`](https://nearblocks.io/txns/EEdfCacwDJvoNmbFPbHep1KJ4pC2EtZoPFGTHxmZoiWs), signed by `intents.near`, three NEP-413 `token_diff` payloads (`solver-multichain-asset.near`, `solver-priv-liq.near` and a user's implicit account) form a USDT(BSC) → USDT(ETH) → PEPE → USDT(BSC) loop in one `execute_intents`. We read this on chain on 2026-11-14.
+- **Terra matcher** ([repo](https://github.com/archtum66-dev/terra-matcher)). Pairwise `token_diff` fills for human limit orders.
+
+What we claim as different, and nothing more:
+1. **One-of-N commitments through a shared nonce.**
+   - An agent signs every competing proposal for one offer, including different rings from different matchers, with **the same Verifier nonce**. At most one of them can ever execute, whatever the agent's balance.
+   - Evidence: in the 3-way race, all 54 losing batches ([race3.json](docs/measurements/race3.json)) failed with `nonce was already used`. A failed `execute_intents` changes no balance, and attack A7 checks the balances explicitly ([attacks.ts](scripts/attacks.ts)).
+   - What we checked first:
+     - Kula's README and RULES.md use the nonce only for replay ("the Verifier's nonce stops the second one"). They avoid double fills by having each member sign only the single best proposal.
+     - The NEAR Intents docs say the nonce "must be unique per intent to prevent replay attacks" and should "never [be] reused for the same account". They don't describe sharing one nonce across alternative payloads.
+     - So this pattern deliberately departs from the docs' advice. It relies on the contract's single-use nonce check, which we measured (K8, A4b, A7, race3).
+   - We don't know whether someone has done it before.
+2. **Standing agent inventories with a 1Click fallback.**
+   - Agents keep their balances inside the Verifier between rings, instead of bringing one swap at a time.
+   - An offer that finds no ring falls back to 1Click. On testnet that fallback is modelled only: the sim counts it, and live execution is refused because 1Click is mainnet-only.
+3. **A measured latency finding, offered as research.** On NEAR, only a transaction whose signer *is* the Verifier executes in its inclusion block. Shard placement doesn't help. See the [research appendix](#research-appendix).
+
 ## Prerequisites
 
 - Node ≥ 20.
