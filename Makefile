@@ -1,6 +1,7 @@
 # Nomad: agents trade in rings, settled in one NEAR Intents call.
 # NEAR testnet only. Nothing here sends a mainnet transaction.
 #
+#   make demo       ONE keyless end-to-end check (~1-2 min): sim, dry-run, mainnet proof, on-chain ring check
 #   make sim        no chain, no keys: seeded swarm, summary line + out/*.svg
 #   make dry-run    simulate_intents on our testnet Verifier for fixtures/rings/*.json (no keys)
 #   make test       unit, property and end-to-end tests (TS + Rust)
@@ -22,10 +23,10 @@ SWEEP ?= 1
 PORT ?= 8787
 TSX := pnpm exec tsx
 
-.PHONY: help install build test test-ts test-rust test-sandbox sim sim-serve dry-run ui live race fixtures race3 relayer-key ui-check mainnet-proof fee-race kill-tests accounts fund fixture-accounts colo-check clean
+.PHONY: help demo install build test test-ts test-rust test-sandbox sim sim-serve dry-run ui live race fixtures race3 relayer-key ui-check mainnet-proof fee-race kill-tests accounts fund fixture-accounts colo-check clean
 
 help:
-	@sed -n '1,14p' Makefile
+	@sed -n '1,/^$$/p' Makefile
 
 node_modules/.modules.yaml: package.json pnpm-workspace.yaml
 	pnpm install
@@ -49,6 +50,18 @@ test-rust:
 test-sandbox:
 	command -v cargo-near >/dev/null || cargo install cargo-near --version 0.23.0 --locked
 	cd contracts/board && cargo near build non-reproducible-wasm && cargo test --quiet --test sandbox
+
+# One keyless command for a fresh clone: build, then four checks, each saying what it shows.
+demo: build
+	@echo; echo "== 1/4 make sim: 20 agents, 5 tokens, no chain. See: rings settled, share of offers cleared by rings"
+	@cd apps/matcher && AGENTS=20 TOKENS=5 SEED=1 ROUNDS=30 SWEEP=0 OUT_DIR=$(CURDIR)/out $(TSX) src/cli-sim.ts
+	@echo; echo "== 2/4 make dry-run: signed 3/4/5-party rings through simulate_intents on our testnet Verifier (read-only). See: k+1 intents_executed"
+	@cd apps/matcher && $(TSX) src/cli-dry-run.ts $(CURDIR)/fixtures/rings
+	@echo; echo "== 3/4 make mainnet-proof: a Nomad-signed ring through simulate_intents on MAINNET intents.near (read-only). See: signatures pass, stops at the balance check"
+	@cd apps/matcher && $(TSX) ../../scripts/mainnet-simulate.ts
+	@echo; echo "== 4/4 on-chain check of ring f5d3e16f (3 wallet standards, closed by a stranger), read from testnet RPC. See: PASS lines"
+	@cd apps/matcher && $(TSX) ../../scripts/check-ring.ts
+	@echo; echo "demo: all four checks passed. No keys used, no transactions sent."
 
 sim: build
 	cd apps/matcher && AGENTS=$(AGENTS) TOKENS=$(TOKENS) SEED=$(SEED) ROUNDS=$(ROUNDS) SWEEP=$(SWEEP) OUT_DIR=$(CURDIR)/out $(TSX) src/cli-sim.ts
