@@ -113,7 +113,7 @@ const SEGMENTS = {
   },
   /* /dashboard: the ring workshop plays the recorded three-wallet ring (f5d3e16f, closed by k4) from its first step.
      Overview while the offers are posted and the legs attached, then Follow (the camera picks up the closer, k4)
-     through close, execute_intents and the settle hop, then back to Overview. The workshop's clock is r3f's,
+     through close and execute_intents, then back to Overview for the settle hop. The workshop's clock is r3f's,
      which runs on virtual time, so the ring's start is found by stepping the paused clock until its first caption shows. */
   async dashboard() {
     await send("Page.navigate", { url: "about:blank" }); await sleep(300);
@@ -135,15 +135,14 @@ const SEGMENTS = {
     }
     console.log(`dashboard: ring start found after ${(steps / 10).toFixed(1)} s of virtual time`);
     const top = await ev(`(() => { const c = document.querySelector('canvas'); let w = c; while (w && !/rounded/.test(w.className || '')) w = w.parentElement;
-      return Math.max(0, (w || c).getBoundingClientRect().top + scrollY - 72); })()`);
+      return Math.max(0, (w || c).getBoundingClientRect().top + scrollY - 14); })()`);
     await ev(`window.scrollTo(0, ${top}); 1`);
     const click = (label) => ev(`(() => { const b = [...document.querySelectorAll('button')].find(e => e.innerText.trim() === '${label}'); b && b.click(); return !!b; })()`);
     let followed = false, back = false;
     await record("dashboard", 14, async (t) => {
-      if (!followed && t >= 5.0) { followed = true; await click("Follow"); }
-      if (!back && t >= 10.6) { back = true; await click("Overview"); }
-    }, [[0.3, "The dashboard: agents post offers and attach their legs."], [5.2, "k4 closes the ring and calls execute_intents."],
-      [8.3, "Settled: every bot in the ring hops on the same beat."], [10.8, "Then the next recorded ring starts."]]);
+      if (!followed && t >= 4.8) { followed = true; await click("Follow"); }
+      if (!back && t >= 7.3) { back = true; await click("Overview"); }
+    }, []); /* no beat line: the workshop's own bottom line names each step, and a beat here would sit on the tab row */
   },
   /* /v2 with every close re-checked on chain in the browser: three held shots with hard cuts, one per ring card
      (mandate ring, ERC-7683 ring, three-wallet ring). Each is scrolled into place and fully re-rastered before its

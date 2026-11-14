@@ -24,7 +24,7 @@ const OVERVIEW_LOOK = new Vector3(0, 0, -1.4)
 const PORTRAIT_POS = new Vector3(0, 27, 7)
 const PORTRAIT_LOOK = new Vector3(0, 0, -0.6)
 // Chase-cam offset from the bot's position (above + diagonal behind).
-const FOLLOW_OFFSET = new Vector3(6, 9, 9)
+const FOLLOW_OFFSET = new Vector3(7, 11.5, 11.5)
 // POS_RATE < LOOK_RATE: the camera glides into place slightly slower than it turns to track.
 const POS_RATE = 2.2
 const LOOK_RATE = 3.5
