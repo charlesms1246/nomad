@@ -11,3 +11,4 @@ out/*
 !out/.gitkeep
 .DS_Store
 *.log
+.taste-skill/
