@@ -4,16 +4,23 @@
 # and saves headless screenshots to out/ui-check/ (ui.png = /dashboard; landing-*.png = /; v2-*.png = /v2). Usage: make ui-check [MATCHER_URL=...]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SIM_PORT="${SIM_PORT:-8791}"; UI_PORT="${UI_PORT:-3091}"
+# Uncommon default ports (cleanup kills whatever listens on them); override with SIM_PORT / UI_PORT.
+SIM_PORT="${SIM_PORT:-38791}"; UI_PORT="${UI_PORT:-33091}"
 MATCHER_URL="${MATCHER_URL:-http://localhost:$SIM_PORT}"
 PIDS=()
 mkdir -p "$ROOT/out/ui-check"
 if lsof -nP -t -i "tcp:$SIM_PORT" -i "tcp:$UI_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   echo "ui-check: ports $SIM_PORT/$UI_PORT are busy (a previous run?); free them first" >&2; exit 1
 fi
-if pgrep -f "next dev" >/dev/null && lsof -t "$ROOT/web/.next/dev" >/dev/null 2>&1; then
-  echo "ui-check: a web/ dev server is already running (Next allows one per project); stop it first" >&2; exit 1
-fi
+# Next 16 refuses a second dev server per project. Find one by its working directory (not by
+# command-line text, which also matches unrelated shells): /proc on Linux, lsof on macOS.
+cwd_of() { readlink "/proc/$1/cwd" 2>/dev/null || lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; }
+for p in $(pgrep -f "next dev" 2>/dev/null || true); do
+  if [[ "$(cwd_of "$p")" == "$ROOT/web" ]]; then
+    echo "ui-check: a web/ dev server is already running (pid $p). Next allows one per project: stop your web dev server first, then rerun." >&2
+    exit 1
+  fi
+done
 cleanup() {
   for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done
   # the subshells' children (tsx, next) outlive their parents: kill whatever holds our ports
@@ -32,20 +39,20 @@ curl -s "http://localhost:$UI_PORT/api/state" -D "$ROOT/out/ui-check/headers.txt
 let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);
 console.log(`ui-check: source=${d.meta.source} agents=${d.agents.length} rings=${d.rings.length} settled=${d.rings.filter(r=>r.status==="settled").length}`);
 if(!d.rings.length){console.error("ui-check: no rings in state");process.exit(1)}})'
-SHOT="$(find "$HOME/Library/Caches/ms-playwright" -name chrome-headless-shell -type f 2>/dev/null | sort | tail -1)"
+SHOT="$(find "$HOME/Library/Caches/ms-playwright" -name chrome-headless-shell -type f 2>/dev/null | sort | tail -1 || true)"
 if [[ -n "$SHOT" ]]; then
   # Real-time screenshots via the DevTools Protocol (scripts/cdp-shot.mjs, Node built-ins only):
   # the landing page's reveal and WebGL background need real time to finish.
   shot() { # name width height path [waitMs] [fullPage] [reduced] [scroll]
     node "$ROOT/scripts/cdp-shot.mjs" "$SHOT" "http://localhost:$UI_PORT$4" "$ROOT/out/ui-check/$1.png" "$2" "$3" "${5:-5000}" "${6:-0}" "${7:-0}" "${8:-0}" | sed 's/^/ui-check: /'
   }
-  shot ui 1440 1600 /dashboard 5000 1                  # the matcher dashboard (was at / before the landing page)
+  shot ui 1440 900 /dashboard 5000 0                  # the matcher dashboard (was at / before the landing page)
   shot landing-1440 1440 900 /
   shot landing-390 390 844 /
   shot landing-1440-replay 1440 900 / 8000 0 0 "#replay"
   shot landing-390-replay 390 844 / 8000 0 0 "#replay"
   shot landing-1440-reduced 1440 900 / 3000 0 1
-  shot v2-1440 1440 1600 /v2 6000 1
+  shot v2-1440 1440 900 /v2 6000 0
   shot v2-390 390 844 /v2 6000
 else
   echo "ui-check: no headless Chromium found (npx playwright install chromium-headless-shell); skipped screenshot"
