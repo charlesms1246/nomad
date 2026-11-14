@@ -205,7 +205,7 @@ function RingCard({ ix, ring, auto, extras }: { ix: TokenIndex; ring: V2Ring; au
   }, [auto, closed, v.phase, ring]);
 
   return (
-    <article className="rounded-xl border border-white/10 bg-[#1a1a19] p-5">
+    <article id={ring.id} className="scroll-mt-6 rounded-xl border border-white/10 bg-[#1a1a19] p-5">
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3 className="flex items-baseline gap-3 text-sm">
           <span style={{ color: s.c }}>
@@ -496,8 +496,11 @@ export default function V2Rings() {
           <button onClick={load} className="rounded-full border border-white/15 px-3 py-1 text-xs text-[#f0efec] hover:border-white/40">
             Refresh
           </button>
-          <Link href="/" className="rounded-full bg-[#f0efec] px-3.5 py-1.5 text-xs font-semibold text-[#0d0d0d] hover:bg-white">
-            ← Matcher dashboard
+          <Link href="/" className="rounded-full border border-white/15 px-3 py-1 text-xs text-[#f0efec] hover:border-white/40">
+            ← Home
+          </Link>
+          <Link href="/dashboard" className="rounded-full bg-[#f0efec] px-3.5 py-1.5 text-xs font-semibold text-[#0d0d0d] hover:bg-white">
+            Matcher dashboard
           </Link>
         </div>
       </header>

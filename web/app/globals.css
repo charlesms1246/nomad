@@ -3,6 +3,8 @@
 :root {
   --background: #0d0d0d;
   --foreground: #f0efec;
+  /* landing accent: categorical slot 1 (dark step), the same blue the dashboard uses for NEAR */
+  --accent-color: #3987e5;
   color-scheme: dark;
 }
 
@@ -17,6 +19,20 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Pixel display face (Geist Pixel Grid): big headings only. Body text stays in Geist Sans. */
+.font-pixel {
+  font-family: var(--font-geist-pixel-grid), var(--font-geist-sans), system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  /* framer-motion reveals: show the final frame (overrides the inline initial styles) */
+  .motion-static { opacity: 1 !important; transform: none !important; filter: none !important; }
 }
 
 svg text {

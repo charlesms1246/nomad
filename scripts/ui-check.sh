@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local UI check against a dev instance (never the deployed UI): starts the sim matcher on
 # $SIM_PORT, a web/ dev server on $UI_PORT pointed at it, checks /api/state through the UI's proxy,
-# and saves a headless screenshot to out/ui-check/ui.png. Usage: make ui-check [MATCHER_URL=...]
+# and saves headless screenshots to out/ui-check/ (ui.png = /dashboard; landing-*.png = /; v2-*.png = /v2). Usage: make ui-check [MATCHER_URL=...]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SIM_PORT="${SIM_PORT:-8791}"; UI_PORT="${UI_PORT:-3091}"
@@ -34,8 +34,15 @@ console.log(`ui-check: source=${d.meta.source} agents=${d.agents.length} rings=$
 if(!d.rings.length){console.error("ui-check: no rings in state");process.exit(1)}})'
 SHOT="$(find "$HOME/Library/Caches/ms-playwright" -name chrome-headless-shell -type f 2>/dev/null | sort | tail -1)"
 if [[ -n "$SHOT" ]]; then
-  "$SHOT" --disable-gpu --window-size=1440,1600 --virtual-time-budget=12000 --screenshot="$ROOT/out/ui-check/ui.png" "http://localhost:$UI_PORT/" >/dev/null 2>&1
-  echo "ui-check: screenshot out/ui-check/ui.png"
+  shot() { # name width height path
+    "$SHOT" --disable-gpu --hide-scrollbars --window-size="$2,$3" --virtual-time-budget=15000 --screenshot="$ROOT/out/ui-check/$1.png" "http://localhost:$UI_PORT$4" >/dev/null 2>&1
+    echo "ui-check: screenshot out/ui-check/$1.png ($2px, $4)"
+  }
+  shot ui 1440 1600 /dashboard            # the matcher dashboard (was at / before the landing page)
+  shot landing-1440 1440 3200 /
+  shot landing-390 390 3600 /
+  shot v2-1440 1440 1600 /v2
+  shot v2-390 390 2400 /v2
 else
   echo "ui-check: no headless Chromium found (npx playwright install chromium-headless-shell); skipped screenshot"
 fi

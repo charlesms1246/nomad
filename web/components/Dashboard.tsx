@@ -202,6 +202,9 @@ export default function Dashboard() {
             </span>
           )}
           {err && <span className="text-[#e66767]">poll error: {err}</span>}
+          <Link href="/" className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-[#f0efec] hover:border-white/40">
+            ← Home
+          </Link>
           <Link
             href="/v2"
             className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-[#f0efec] hover:border-white/40"

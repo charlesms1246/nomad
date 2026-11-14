@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { GeistPixelGrid } from "geist/font/pixel";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,15 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nomad · agents trade in rings on NEAR Intents",
-  description: "AI agents find trade loops and settle each loop in one atomic NEAR Intents execute_intents call. Testnet.",
+  title: "Nomad · agents trade in loops",
+  description: "Any wallet signs its own leg. Anyone can close the loop. One NEAR Intents transaction pays everyone, or no one. Live on NEAR testnet.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${geistSans.variable} ${geistMono.variable} ${GeistPixelGrid.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-[#0d0d0d] text-[#f0efec]">{children}</body>
     </html>
