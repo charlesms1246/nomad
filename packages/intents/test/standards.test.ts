@@ -13,6 +13,8 @@ import {
   rawEd25519AccountId,
   signErc191TokenDiff,
   signRawEd25519TokenDiff,
+  signTokenDiff,
+  randomKeyPair,
   verifyAnyPayload,
   type SignedRawEd25519Payload,
 } from '../src/index.js';
@@ -106,5 +108,18 @@ describe('raw_ed25519 (vectors from near/intents)', () => {
     expect(() =>
       signRawEd25519TokenDiff({ seed: new Uint8Array(32), verifierId: 'v', salt: '00000000', deadline: new Date(), diff: { a: '0' } }),
     ).toThrow(/zero/);
+  });
+});
+
+describe('mixed batches', () => {
+  it('verifyAnyPayload accepts every standard in one batch and rejects a tampered nep413 leg', () => {
+    const base = { verifierId: 'intents.nomadswarm.testnet', salt: '00000000', deadline: new Date('2030-01-01T00:00:00.000Z') };
+    const kp = randomKeyPair();
+    const nep = signTokenDiff({ ...base, signerId: 'a01.nomadswarm.testnet', secretKey: kp.secretKeyStr, diff: { a: '-2', b: '1' } });
+    const eth = signErc191TokenDiff({ ...base, privateKey: new Uint8Array(32).fill(3), diff: { b: '-2', c: '1' } });
+    const sol = signRawEd25519TokenDiff({ ...base, seed: new Uint8Array(32).fill(4), diff: { c: '-2', a: '1' } });
+    expect([nep, eth, sol].map(verifyAnyPayload)).toEqual([true, true, true]);
+    const bad = { ...nep, payload: { ...nep.payload, message: nep.payload.message.replace('"1"', '"2"') } };
+    expect(verifyAnyPayload(bad)).toBe(false);
   });
 });

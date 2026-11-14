@@ -19,7 +19,7 @@ import { keccak_256 } from '@noble/hashes/sha3';
 import { sha256 } from '@noble/hashes/sha256';
 import { b58decode, b58encode, b64encode, concat, hexencode, utf8 } from './encoding.js';
 import { buildNonce } from './nonce.js';
-import type { Intent, MultiPayload, TokenDiffIntent, TokenId } from './nep413.js';
+import { verifyPayload, type Intent, type MultiPayload, type TokenDiffIntent, type TokenId } from './nep413.js';
 
 export interface SignedErc191Payload {
   standard: 'erc191';
@@ -171,8 +171,10 @@ export function signRawEd25519TokenDiff(a: SignRawEd25519TokenDiffArgs): SignedR
 
 /* ---------- verification and hashes ---------- */
 
-/** Local signature check; also checks that signer_id is the key's implicit account. */
+/** Local signature check for any standard Nomad produces. For erc191 and raw_ed25519 it also checks that
+ * signer_id is the key's implicit account (nep413 signers are named accounts, checked on chain). */
 export function verifyAnyPayload(mp: AnyMultiPayload): boolean {
+  if (mp.standard === 'nep413') return verifyPayload(mp);
   try {
     if (mp.standard === 'erc191') {
       const sig = b58decode(mp.signature.replace(/^secp256k1:/, ''));
