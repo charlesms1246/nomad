@@ -23,3 +23,5 @@ web/AGENTS.md
 # Placeholder files for empty folders stay local
 .gitkeep
 **/.gitkeep
+.vercel
+.env*
