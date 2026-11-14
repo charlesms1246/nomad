@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 
-/** Talos's colour-sweep button, in plain sans: the accent fill slides in from the left on hover. */
+/** Colour-sweep button: the accent fill slides in from the left on hover. */
 export default function SweepButton({ href, children, onClick }: { href: string; children: ReactNode; onClick?: (e: React.MouseEvent) => void }) {
   return (
     <Link

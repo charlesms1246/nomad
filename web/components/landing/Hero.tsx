@@ -6,7 +6,7 @@ import SweepButton from "./SweepButton";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
-/** Talos's hero motion (blur + scale + rise, staggered; the divider draws in), with Nomad's words. */
+/** Hero motion: blur + scale + rise, staggered; the divider draws in. */
 export default function Hero() {
   // Same initial state on server and client (no hydration mismatch). Under reduced motion the
   // `motion-static` class (globals.css) pins every element to its final frame instead.

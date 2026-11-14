@@ -1,5 +1,4 @@
-// Adapted from Talos (components/Dither.jsx), used with permission: a ring term added to the wave
-// field, a 'demand' frame loop when animation is off, and a capped DPR.
+// Dithered wave field with a ring term, a 'demand' frame loop when animation is off, and a capped DPR.
 //
 // three.js uniforms are meant to be one long-lived object that is mutated every frame and handed
 // to the material once. React's compiler rules forbid exactly that (reading a ref in render);

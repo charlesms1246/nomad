@@ -1,7 +1,7 @@
 "use client";
 
-// Replays one real v2 ring from rings.nomadswarm.testnet, stage by stage. Adapted from Talos's
-// decision-lifecycle bento (pending / active / done cells, sweep light, prev / next / pause with
+// Replays one real v2 ring from rings.nomadswarm.testnet, stage by stage, as a
+// lifecycle bento (pending / active / done cells, sweep light, prev / next / pause with
 // auto-resume), with plain headings and real chain data. Reads testnet when the section nears the
 // viewport; until then, or if RPC fails, it shows a saved copy of the same ring.
 

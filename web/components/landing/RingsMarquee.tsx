@@ -1,6 +1,6 @@
 "use client";
 
-// Recent rings from rings.nomadswarm.testnet as a scroll-velocity marquee (Talos's loop: it drifts on
+// Recent rings from rings.nomadswarm.testnet as a scroll-velocity marquee (it drifts on
 // its own, scrolling adds velocity, hovering slows it nearly to a stop). Each item links to /v2.
 
 import Link from "next/link";
