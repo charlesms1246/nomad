@@ -36,10 +36,10 @@ body{font-family:G,sans-serif;color:#f2f4f8;-webkit-font-smoothing:antialiased}
 .lab{font-weight:500;font-size:64px;margin-top:34px;letter-spacing:-0.01em}
 .sub{font-weight:400;font-size:34px;margin-top:22px;color:#9aa4b8}
 .acc{color:#3987e5}`;
-const page = (body, transparent = false) => `<!doctype html><html><head><style>${css}</style></head><body class="${transparent ? "" : "bg"}">${body}</body></html>`;
+const page = (body, transparent = false) => `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body class="${transparent ? "" : "bg"}">${body}</body></html>`;
 const cards = {
-  "cold-title.png": [page(`<div style="position:absolute;left:0;right:0;top:118px;text-align:center">
-    <span style="display:inline-block;font-weight:700;font-size:104px;letter-spacing:-0.025em;line-height:1.05;padding:18px 44px;background:rgba(7,9,13,0.72);border-radius:6px">
+  "cold-title.png": [page(`<div style="position:absolute;left:0;right:0;top:34px;text-align:center">
+    <span style="display:inline-block;font-weight:700;font-size:92px;letter-spacing:-0.025em;line-height:1.05;padding:14px 40px;background:rgba(7,9,13,0.72);border-radius:6px">
     Three agents. <span class="acc">One transaction.</span></span></div>`, true), true],
   "num-1.png": [page(`<div class="wrap"><div class="num">27</div><div class="lab">rings settled, <span class="acc">0 failed</span></div>
     <div class="sub">A 36-minute live run with 12 agents on NEAR testnet</div></div>`)],

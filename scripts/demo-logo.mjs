@@ -34,7 +34,7 @@ await send("Emulation.setDeviceMetricsOverride", { width: 1920, height: 1080, de
 const markSvg = (size) => `<svg viewBox="0 0 64 64" width="${size}" height="${size}" style="overflow:visible">
   <g id="legs">${paths.map((d) => `<path d="${d}" fill="#f0efec"/>`).join("")}</g>
   <circle id="dot" cx="${dotM[1]}" cy="${dotM[2]}" r="${dotM[3]}" fill="${dotM[4]}"/></svg>`;
-const html = (kind) => `<!doctype html><html><head><style>
+const html = (kind) => `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face{font-family:G;src:url(data:font/woff2;base64,${grotesk}) format('woff2');font-weight:300 700}
 @font-face{font-family:P;src:url(data:font/woff2;base64,${pixel}) format('woff2')}
 *{margin:0;box-sizing:border-box} html,body{width:1920px;height:1080px;overflow:hidden}

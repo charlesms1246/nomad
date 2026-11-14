@@ -297,7 +297,7 @@ function captions(s, ph) {
   }
   if (beatSpan.textContent !== txt) beatSpan.textContent = txt;
   beatBox.style.opacity = txt ? a : 0;
-  if (NOCAP) { capBox.style.opacity = 0; beatBox.style.opacity = 0; }
+  if (NOCAP) { capBox.style.opacity = 0; beatBox.style.opacity = 0; markBox.style.opacity = 0; }
 }
 
 let cur = -1;
