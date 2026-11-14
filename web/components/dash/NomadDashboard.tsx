@@ -22,7 +22,21 @@ type Tab = (typeof TABS)[number];
 // Times in UTC, so a recorded snapshot reads the same everywhere.
 const clock = (ms: number) => new Date(ms).toLocaleTimeString("en-GB", { hour12: false, timeZone: "UTC" });
 const dateTime = (ms: number) =>
-  `${new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" })} UTC`;
+  new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
+
+/**
+ * Several matchers race to settle the same signed legs. The Verifier accepts each signed nonce once, so the
+ * slower submissions panic with "nonce was already used": nothing moves. Those are lost races, not failures.
+ */
+const isLostRace = (r: Ring) => r.status === "failed" && /nonce was already used/i.test(r.error ?? "");
+
+/** The Verifier's or matcher's reason, without the generic wrapper, in plain words. */
+function reasonOf(error: string | null): string {
+  if (!error) return "no reason recorded";
+  const declined = /^declined: ([^ ]+) \((.+)\)$/.exec(error);
+  if (declined) return `${shortAgent(declined[1])} declined to sign: ${declined[2]}`;
+  return error.replace(/^execute: /, "").replace(/^Smart contract panicked: /, "Verifier: ");
+}
 
 function Panel({ title, right, children, className = "", delay = 0 }: { title: string; right?: ReactNode; children: ReactNode; className?: string; delay?: number }) {
   return (
@@ -46,7 +60,7 @@ function Panel({ title, right, children, className = "", delay = 0 }: { title: s
 interface Ev {
   key: string;
   t: number;
-  tone: "info" | "good" | "bad";
+  tone: "info" | "good" | "bad" | "lost";
   title: string;
   detail: string;
   tx?: string;
@@ -55,36 +69,39 @@ interface Ev {
 function eventsOf(rings: Ring[]): Ev[] {
   const out: Ev[] = [];
   for (const r of rings) {
-    const who = r.legs.map((l) => shortAgent(l.agent)).join(", ");
-    out.push({ key: `${r.ringId}-p`, t: r.proposedAtMs, tone: "info", title: `Ring of ${r.k} proposed`, detail: `${who}, matched by ${shortAgent(r.matcher)}` });
+    const m = shortAgent(r.matcher);
+    out.push({ key: `${r.ringId}-p`, t: r.proposedAtMs, tone: "info", title: `Ring of ${r.k} from ${m}`, detail: r.legs.map((l) => shortAgent(l.agent)).join(", ") });
     if (r.signedBy.length)
-      out.push({ key: `${r.ringId}-s`, t: r.proposedAtMs + 1, tone: "info", title: `${r.signedBy.length} of ${r.k} legs signed`, detail: `${r.signedBy.map(shortAgent).join(", ")}, for ${shortAgent(r.matcher)}` });
+      out.push({
+        key: `${r.ringId}-s`,
+        t: r.proposedAtMs + 1,
+        tone: "info",
+        title: r.signedBy.length === r.k ? `All ${r.k} legs signed` : `${r.signedBy.length} of ${r.k} legs signed`,
+        detail: `for ${m}`,
+      });
     if (r.status === "settled")
       out.push({
         key: `${r.ringId}-x`,
         t: r.settledAtMs ?? r.proposedAtMs + 2,
         tone: "good",
-        title: "Settled in one transaction",
-        detail: `block ${r.blockHeight?.toLocaleString("en-US") ?? "?"}${r.blocksToExec != null ? `, ${r.blocksToExec} block${r.blocksToExec === 1 ? "" : "s"} after it was sent` : ""}`,
+        title: `Settled by ${m}`,
+        detail: `block ${r.blockHeight?.toLocaleString("en-US") ?? "unknown"}${r.blocksToExec != null ? `, ${r.blocksToExec}-block wait` : ""}`,
         tx: r.txHash ?? undefined,
       });
-    if (r.status === "failed") {
-      // Several matchers race for the same signed legs; the Verifier accepts a nonce once, so the slower ones fail.
-      const lostRace = /nonce was already used/i.test(r.error ?? "");
+    if (r.status === "failed")
       out.push({
         key: `${r.ringId}-f`,
         t: r.settledAtMs ?? r.proposedAtMs + 2,
-        tone: "bad",
-        title: lostRace ? `${shortAgent(r.matcher)} was too late` : "Ring failed",
-        detail: lostRace ? "These signed legs were already settled, so the Verifier refused them again" : (r.error ?? "no reason recorded"),
+        tone: isLostRace(r) ? "lost" : "bad",
+        title: isLostRace(r) ? `${m} lost the race` : `Failed for ${m}`,
+        detail: reasonOf(r.error),
         tx: r.txHash ?? undefined,
       });
-    }
   }
   return out.sort((a, b) => b.t - a.t);
 }
 
-const TONE = { info: "#898781", good: "#0ca30c", bad: "#d03b3b" };
+const TONE = { info: "#898781", good: "#0ca30c", bad: "#d03b3b", lost: "#c98500" };
 
 function EventStream({ state, limit }: { state: NomadState; limit?: number }) {
   const all = useMemo(() => eventsOf(state.rings), [state.rings]);
@@ -105,7 +122,7 @@ function EventStream({ state, limit }: { state: NomadState; limit?: number }) {
             <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: TONE[e.tone] }} />
             <div className="min-w-0 flex-1">
               <p className="text-sm text-[#f0efec]">{e.title}</p>
-              <p className="truncate text-sm text-[#898781]" title={e.detail}>
+              <p className="break-words text-sm text-[#898781]">
                 {e.detail}
               </p>
             </div>
@@ -252,15 +269,16 @@ function Balances({ state, ix }: { state: NomadState; ix: TokenIndex }) {
 
 function Reputation({ state }: { state: NomadState }) {
   const rows = useMemo(() => {
-    const m = new Map<string, { joined: number; signed: number; settled: number; failed: number }>();
-    for (const a of state.agents) m.set(a.id, { joined: 0, signed: 0, settled: 0, failed: 0 });
+    const m = new Map<string, { joined: number; signed: number; settled: number; lost: number; failed: number }>();
+    for (const a of state.agents) m.set(a.id, { joined: 0, signed: 0, settled: 0, lost: 0, failed: 0 });
     for (const r of state.rings)
       for (const l of r.legs) {
-        const row = m.get(l.agent) ?? { joined: 0, signed: 0, settled: 0, failed: 0 };
+        const row = m.get(l.agent) ?? { joined: 0, signed: 0, settled: 0, lost: 0, failed: 0 };
         row.joined++;
         if (r.signedBy.includes(l.agent)) row.signed++;
         if (r.status === "settled") row.settled++;
-        if (r.status === "failed") row.failed++;
+        if (isLostRace(r)) row.lost++;
+        else if (r.status === "failed") row.failed++;
         m.set(l.agent, row);
       }
     return [...m.entries()].sort((a, b) => b[1].settled - a[1].settled || b[1].joined - a[1].joined);
@@ -268,13 +286,14 @@ function Reputation({ state }: { state: NomadState }) {
   const max = Math.max(1, ...rows.map(([, r]) => r.joined));
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[620px] text-left text-sm">
+      <table className="w-full min-w-[700px] text-left text-sm">
         <thead className="text-[#898781]">
           <tr className="border-b border-white/10">
             <th className="px-5 py-3 font-normal">Agent</th>
             <th className="px-3 py-3 font-normal">Rings joined</th>
             <th className="px-3 py-3 text-right font-normal">Signed its leg</th>
             <th className="px-3 py-3 text-right font-normal">Settled</th>
+            <th className="px-3 py-3 text-right font-normal">Lost races</th>
             <th className="px-5 py-3 text-right font-normal">Failed</th>
           </tr>
         </thead>
@@ -292,6 +311,12 @@ function Reputation({ state }: { state: NomadState }) {
                       transition={{ duration: 0.8, ease }}
                     />
                     <motion.div
+                      className="motion-static h-full rounded-full bg-[#c98500]"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(r.lost / max) * 100}%` }}
+                      transition={{ duration: 0.8, ease }}
+                    />
+                    <motion.div
                       className="motion-static h-full rounded-full bg-[#d03b3b]"
                       initial={{ width: 0 }}
                       animate={{ width: `${(r.failed / max) * 100}%` }}
@@ -303,23 +328,25 @@ function Reputation({ state }: { state: NomadState }) {
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums text-[#c3c2b7]">{r.signed}</td>
               <td className="px-3 py-2.5 text-right tabular-nums text-[#0ca30c]">{r.settled}</td>
+              <td className={`px-3 py-2.5 text-right tabular-nums ${r.lost ? "text-[#c98500]" : "text-[#5c5b57]"}`}>{r.lost}</td>
               <td className={`px-5 py-2.5 text-right tabular-nums ${r.failed ? "text-[#d03b3b]" : "text-[#5c5b57]"}`}>{r.failed}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="px-5 py-3 text-sm text-[#5c5b57]">Counted over the rings in this matcher&apos;s feed. Green is settled, red is failed.</p>
+      <p className="px-5 py-3 text-sm text-[#5c5b57]">Counted over the rings in this matcher&apos;s feed. Green is settled, amber is a lost race (another ring settled the same legs first), red is failed.</p>
     </div>
   );
 }
 
 // ---------- page ----------
 
-function Fact({ value, label }: { value: ReactNode; label: string }) {
+function Fact({ value, label, detail }: { value: ReactNode; label: string; detail?: string }) {
   return (
     <div className="flex flex-col gap-1 px-5 py-4">
       <span className="font-pixel text-3xl leading-none text-[#f0efec] sm:text-4xl">{value}</span>
-      <span className="text-sm text-[#898781]">{label}</span>
+      <span className="text-sm text-[#c3c2b7]">{label}</span>
+      {detail && <span className="text-sm leading-snug text-[#898781]">{detail}</span>}
     </div>
   );
 }
@@ -368,7 +395,8 @@ export default function NomadDashboard() {
     const blocks = settled.map((r) => r.blocksToExec).filter((b): b is number => b != null).sort((a, b) => a - b);
     return {
       settled: settled.length,
-      failed: state.rings.filter((r) => r.status === "failed").length,
+      lost: state.rings.filter(isLostRace).length,
+      failed: state.rings.filter((r) => r.status === "failed" && !isLostRace(r)).length,
       agents: state.agents.length,
       offers: state.agents.reduce((n, a) => n + a.offers.length, 0),
       medianBlocks: blocks.length ? blocks[Math.floor((blocks.length - 1) / 2)] : null,
@@ -421,7 +449,8 @@ export default function NomadDashboard() {
               {sourceText}
             </span>
             {matcher && <span>· matcher {shortAgent(matcher)}</span>}
-            {updated && <span>· updated {clock(updated)} UTC</span>}
+            {updated && <span>· updated {clock(updated)}</span>}
+            <span>· times in UTC</span>
           </p>
         </div>
 
@@ -446,10 +475,11 @@ export default function NomadDashboard() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.16, duration: 0.6, ease }}
-            className="motion-static grid grid-cols-2 divide-white/10 rounded-2xl border border-white/10 bg-[#111110]/85 sm:grid-cols-3 lg:grid-cols-5 [&>*]:border-white/10 max-lg:[&>*]:border-b lg:divide-x"
+            className="motion-static grid grid-cols-2 divide-white/10 rounded-2xl border border-white/10 bg-[#111110]/85 sm:grid-cols-3 lg:grid-cols-6 [&>*]:border-white/10 max-lg:[&>*]:border-b lg:divide-x"
           >
             <Fact value={counts.settled} label="Rings settled" />
-            <Fact value={counts.failed} label="Rings failed" />
+            <Fact value={counts.lost} label="Lost races" detail="Legs already settled by another ring; nothing moved" />
+            <Fact value={counts.failed} label="Failed" detail={counts.failed ? "Not signed or rejected; reasons in Ring events" : undefined} />
             <Fact value={counts.agents} label="Agents" />
             <Fact value={counts.offers} label="Open offers" />
             <Fact value={counts.medianBlocks ?? "none"} label="Median blocks to run" />

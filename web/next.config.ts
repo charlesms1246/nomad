@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     agentFeedback: true,
   },
   cacheComponents: true,
+  // The dev-only Next.js badge stays out of local screenshots (production never shows it).
+  devIndicators: false,
   partialPrefetching: true,
   turbopack: {
     rules: {
