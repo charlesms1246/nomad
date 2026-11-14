@@ -39,18 +39,6 @@ export function toUnits(ix: TokenIndex, id: TokenId, amt: string): number {
   }
 }
 
-export function fmtNum(n: number): string {
-  if (n === 0) return "0";
-  const a = Math.abs(n);
-  if (a >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (a >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
-  return n.toLocaleString("en-US", { maximumSignificantDigits: 4, maximumFractionDigits: 20 });
-}
-
-export function fmtAmt(ix: TokenIndex, id: TokenId, amt: string): string {
-  return `${fmtNum(toUnits(ix, id, amt))} ${sym(ix, id)}`;
-}
-
 /**
  * Amount in whole tokens without rounding ("0.999999 USDT"). Long fractions (24-decimal wNEAR) are cut
  * to `sig` significant digits and marked with "…"; never rounded, so a 1-unit fee stays visible.
@@ -77,15 +65,3 @@ export function shortHash(h: string, n = 6): string {
   return h.length > 2 * n + 1 ? `${h.slice(0, n)}…${h.slice(-n)}` : h;
 }
 
-export function fmtBps(b: number | null | undefined, digits = 1): string {
-  return b == null ? "—" : `${b.toFixed(digits)} bps`;
-}
-
-export function fmtUsd(v: number | null | undefined): string {
-  if (v == null) return "—";
-  return v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`;
-}
-
-export function fmtTime(ms: number): string {
-  return new Date(ms).toISOString().replace("T", " ").slice(0, 16) + " UTC";
-}

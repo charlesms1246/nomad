@@ -10,7 +10,7 @@
 // Signed legs are decoded per wallet standard (nep413, erc191, raw_ed25519, ...).
 
 import { useSyncExternalStore } from "react";
-import type { AccountId, Ring, TokenId } from "./types";
+import type { TokenId } from "./types";
 
 export const TESTNET_RPC = "https://rpc.testnet.fastnear.com";
 
@@ -223,81 +223,7 @@ export async function inspectSettlement(txHash: string, sender: string, verifier
   };
 }
 
-/* ---------- v1: a matcher ring from /api/state ---------- */
-
-export interface LegCheck {
-  agent: AccountId;
-  role: "agent" | "matcher";
-  standard: string | null;
-  claimed: Diff | null; // from the ring (null: an account on chain that the ring doesn't list)
-  signed: Diff | null; // from the signed message in the tx args
-  executed: Diff | null; // from the Verifier's dip4 token_diff event
-  intentExecuted: boolean; // listed in the intents_executed event
-  match: boolean;
-}
-
-export interface Verification {
-  txHash: string;
-  txSigner: AccountId;
-  receiver: AccountId;
-  method: string;
-  status: string;
-  success: boolean;
-  includedHeight: number;
-  executedHeight: number | null;
-  blocksToExec: number | null;
-  legs: LegCheck[];
-  allMatch: boolean; // chain outcome agrees with ring.status and every leg checks out
-  checkedAtMs: number;
-}
-
 export type CheckState<T> = { phase: "idle" } | { phase: "checking" } | { phase: "done"; result: T } | { phase: "error"; message: string };
-export type VerifyState = CheckState<Verification>;
-
-function claimedDiffs(ring: Ring): Map<AccountId, Diff> {
-  const m = new Map<AccountId, Diff>();
-  for (const l of ring.legs) m.set(l.agent, { [l.give]: (-BigInt(l.giveAmt)).toString(), [l.get]: BigInt(l.getAmt).toString() });
-  if (ring.matcherLeg.amt !== "0") m.set(ring.matcher, { [ring.matcherLeg.token]: BigInt(ring.matcherLeg.amt).toString() });
-  return m;
-}
-
-export async function verifyRing(ring: Ring, verifier = "intents.nomadswarm.testnet"): Promise<Verification> {
-  if (!ring.txHash) throw new Error("This ring has no transaction hash");
-  const s = await inspectSettlement(ring.txHash, ring.txSigner ?? ring.matcher, verifier);
-  const claimed = new Map([...claimedDiffs(ring)].map(([k, v]) => [k.toLowerCase(), [k, v] as const]));
-  const accounts = [...new Set([...claimed.keys(), ...s.signed.keys(), ...s.executed.keys()])];
-  const legs: LegCheck[] = accounts.map((lc) => {
-    const [name, c] = claimed.get(lc) ?? [lc, null];
-    const sg = s.signed.get(lc) ?? null;
-    const e = s.executed.get(lc) ?? null;
-    return {
-      agent: name,
-      role: name === ring.matcher ? "matcher" : "agent",
-      standard: sg?.standard ?? null,
-      claimed: c,
-      signed: sg?.diff ?? null,
-      executed: e,
-      intentExecuted: s.executedIntents.has(lc),
-      // Settled: claimed == signed == executed. Failed batch: nothing executed, so the
-      // signed leg must equal the claim and nothing may have moved for this account.
-      match: s.success ? sameDiff(c, sg?.diff ?? null) && sameDiff(c, e) && s.executedIntents.has(lc) : sameDiff(c, sg?.diff ?? null) && !e,
-    };
-  });
-  return {
-    txHash: ring.txHash,
-    txSigner: s.txSigner,
-    receiver: s.txReceiver,
-    method: s.txMethod,
-    status: s.status,
-    success: s.success,
-    includedHeight: s.includedHeight,
-    executedHeight: s.executedHeight,
-    blocksToExec: s.executedHeight != null ? s.executedHeight - s.includedHeight : null,
-    legs,
-    allMatch: s.success === (ring.status === "settled") && legs.length > 0 && legs.every((l) => l.match),
-    checkedAtMs: Date.now(),
-  };
-}
 
 /* ---------- shared store: every view of the same check shows the same result ---------- */
 
@@ -330,17 +256,4 @@ export function useCheck<T>(key: string | null): CheckState<T> {
     () => ((key ? store.get(key) : undefined) ?? IDLE) as CheckState<T>,
     () => IDLE,
   );
-}
-
-export function recheck(ring: Ring, opts: { once?: boolean } = {}) {
-  if (ring.txHash) runCheck(ring.txHash, () => verifyRing(ring), opts);
-}
-
-export function useVerification(txHash: string | null): VerifyState {
-  return useCheck<Verification>(txHash);
-}
-
-/** Only real chain data can be re-checked; mock and sim hashes are invented. */
-export function canRecheck(source: string, ring: Ring): boolean {
-  return !!ring.txHash && (source === "live" || source === "recorded");
 }

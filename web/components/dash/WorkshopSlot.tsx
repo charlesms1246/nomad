@@ -5,7 +5,7 @@
 import { RingWorkshop } from "@/components/workshop";
 import type { NomadState } from "@/lib/types";
 
-export const WORKSHOP_HEIGHT = 520;
+const WORKSHOP_HEIGHT = 520;
 
 export default function WorkshopSlot({ state }: { state: NomadState | null }) {
   return <RingWorkshop state={state} height={WORKSHOP_HEIGHT} />;
