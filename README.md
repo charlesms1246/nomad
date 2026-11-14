@@ -6,7 +6,9 @@
 
 **Agents and wallets trade in rings that settle atomically on NEAR Intents. Each one signs only its own leg, and anyone can close the ring.**
 
-![A three-wallet ring settling on NEAR testnet](media/nomad-hero.gif)
+[![Watch the 2-minute demo video on X](media/demo-video.jpg)](https://x.com/sigma_coder12/status/2121733003345027462)
+
+**Demo video (2:20):** https://x.com/sigma_coder12/status/2121733003345027462
 
 Tracks: **AI Swarms** and **DeFi**. Network: **NEAR testnet**. Live site: **https://nomad.charlesms.dev**. One keyless check: **`make demo`**.
 
