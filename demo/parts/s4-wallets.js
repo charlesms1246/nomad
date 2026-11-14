@@ -16,6 +16,7 @@ const RINGW = [
 ];
 registerScene({
   key: "wallets", loop: 21,
+  capHide: [[5.1, 7.4], [19.6, 21.3]],
   cap: { t: "Any wallet can sign a leg.",
          s: "NEAR accounts, Ethereum wallets and Solana-style keys settle in the same ring." },
   beats: [[0.4, "One ring on testnet, three wallet standards."], [2.4, "k4 closed it. All three legs settled in one call."],
@@ -26,13 +27,15 @@ registerScene({
   shots: [
     [0, 2.35, { p: [0, 3.7, 10.4], l: [0, 1.0, 0], fov: 42 }, { p: [0, 3.5, 9.8], l: [0, 1.0, 0], fov: 42 }],
     [2.35, 4.0, { p: [0, 7.4, 8.6], l: [0, 0.4, 0.3], fov: 46 }, { p: [0, 7.0, 8.2], l: [0, 0.4, 0.3], fov: 46 }],
-    [4.0, 7.2, { p: [0, 3.0, -5.0], l: [0, 3.0, -12], fov: 40 }, { p: [0, 3.0, -5.35], l: [0, 3.0, -12], fov: 40 }, t => t],
+    [4.0, 5.3, { p: [0, 3.0, -5.0], l: [0, 3.0, -12], fov: 40 }, { p: [0, 3.0, -5.25], l: [0, 3.0, -12], fov: 40 }, t => t],
+    [5.3, 7.2, { p: [0.0, 3.05, -6.95], l: [0.0, 3.05, -12], fov: 40 }, { p: [0.0, 3.05, -7.1], l: [0.0, 3.05, -12], fov: 40 }, t => t],
     [7.2, 9.7, { p: [18.2, 2.6, 7.8], l: [19.5, 1.35, 0], fov: 36 }, { p: [18.4, 2.55, 7.4], l: [19.5, 1.35, 0], fov: 36 }],
     [9.7, 11.3, { p: [19.3, 2.3, 6.8], l: [19.4, 1.35, 0], fov: 34 }, { p: [19.3, 2.25, 6.5], l: [19.4, 1.35, 0], fov: 34 }],
     [11.3, 13.7, { p: [20.0, 3.0, 10.2], l: [20.0, 1.9, 0], fov: 40 }, { p: [20.0, 2.95, 9.7], l: [20.0, 1.9, 0], fov: 40 }, t => t],
     [13.7, 16.9, { p: [39.2, 2.0, 6.6], l: [39.2, 1.45, 0], fov: 34 }, { p: [39.2, 2.0, 6.2], l: [39.2, 1.45, 0], fov: 34 }],
     [16.9, 18.6, { p: [40.9, 2.5, 9.6], l: [40.9, 1.7, -0.4], fov: 40 }, { p: [40.9, 2.45, 9.2], l: [40.9, 1.7, -0.4], fov: 40 }],
-    [18.6, 21, { p: [42.32, 2.05, 4.35], l: [42.9, 2.05, -0.6], fov: 40 }, { p: [42.36, 2.05, 4.05], l: [42.9, 2.05, -0.6], fov: 40 }, t => t],
+    [18.6, 19.8, { p: [42.32, 2.05, 4.35], l: [42.9, 2.05, -0.6], fov: 40 }, { p: [42.36, 2.05, 4.1], l: [42.9, 2.05, -0.6], fov: 40 }, t => t],
+    [19.8, 21, { p: [42.55, 2.0, 2.45], l: [42.9, 2.0, -0.6], fov: 40 }, { p: [42.56, 2.0, 2.33], l: [42.9, 2.0, -0.6], fov: 40 }, t => t],
   ],
   build(g) {
     /* ── A: the three-wallet ring ── */
@@ -41,6 +44,7 @@ registerScene({
     const T_FLY = 2.45, T_LAND = 3.1;
     const bursts = RINGW.map((d, i) => makeBurst(g, TOK[d.gives], 12, { seed: i * 5 }));
     const mon = makeMonitor(g, "./assets/screens/v2-ring-f5d3e16fca.png", 6.4, { aspect: 2304 / 1124, standH: 1.4, name: "monitor A" });
+    SUBJECTS[SUBJECTS.length - 1].crop = t => t >= 5.3 && t < 7.2;   /* the push-in close-up crops the monitor on purpose */
     /* ── B: the mandate vault ── */
     const B = new THREE.Group(); B.position.x = 20; g.add(B); gridFloor(B, 40);
     const vault = new THREE.Group(); B.add(vault); subject(vault, "vault");
@@ -74,6 +78,7 @@ registerScene({
     subject(order.g, "order card");
     const ostamp = makeStamp(C, ACCENT); ostamp.g.rotation.x = Math.PI / 2;
     const monC = makeMonitor(C, "./assets/screens/v2-ring-a44df021aa.png", 3.9, { aspect: 2304 / 1248, standH: 0.9, name: "monitor C" });
+    SUBJECTS[SUBJECTS.length - 1].crop = t => t >= 19.8;
     const tokC = makeToken(C, "USDC", 0.42);
 
     return { update(ph) {
@@ -129,10 +134,11 @@ registerScene({
       order.g.scale.setScalar(Math.max(0.0001, eOutBack(od, 1.2)));
       order.g.position.set(-0.6, 1.55 + (ph > 14.25 ? Math.exp(-(ph - 14.25) * 7) * Math.sin((ph - 14.25) * 22) * 0.08 : 0), 0);
       order.g.rotation.z = (1 - od) * -0.08;
-      const landed = ostamp.at(ph, 16.0, 0.55);
-      ostamp.g.position.set(-0.6 + order.mark.position.x, order.g.position.y + order.mark.position.y, 0.08);
-      const sv = win(ph, 15.0, 15.2, 16.75, 17.0); ostamp.g.scale.setScalar(Math.max(0.0001, sv)); ostamp.g.visible = sv > 0.001;
-      order.setMark(landed ? eOutBack(seg(ph, 16.0, 16.25), 2.5) : 0);
+      ostamp.at(ph, 16.0, 0.55);
+      const oex = ostamp.exit(ph, 16.0);
+      ostamp.g.position.set(-0.6 + order.mark.position.x, order.g.position.y + order.mark.position.y + oex.up, 0.08);
+      const sv = Math.min(seg(ph, 15.0, 15.2), oex.s); ostamp.g.scale.setScalar(Math.max(0.0001, sv)); ostamp.g.visible = sv > 0.001;
+      order.setMark(ph > 16.0 + ostamp.markAt ? eOutBack(seg(ph, 16.0 + ostamp.markAt, 16.22 + ostamp.markAt), 2.5) : 0);
       const mc = seg(ph, 17.0, 17.7);
       monC.g.visible = ph > 16.95;
       monC.g.position.set(2.9, 2.0, -0.6); monC.g.rotation.y = -0.12;

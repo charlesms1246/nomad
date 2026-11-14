@@ -234,7 +234,7 @@ function registerScene(s) { SCENES.push(s); }
 /* ── boot ── */
 const capT = document.querySelector("#cap .t"), capS = document.querySelector("#cap .s"),
       capBox = document.getElementById("cap"), beatBox = document.getElementById("beat"),
-      beatSpan = document.querySelector("#beat span");
+      beatSpan = document.querySelector("#beat span"), markBox = document.getElementById("mark");
 const built = [];
 let world = null;
 
@@ -282,7 +282,9 @@ function captions(s, ph) {
   const c = s.cap || {};
   if (capT.textContent !== (c.t || "")) capT.textContent = c.t || "";
   if (capS.textContent !== (c.s || "")) capS.textContent = c.s || "";
-  capBox.style.opacity = eOutCubic(seg(ph, 0.1, 0.3)) * (1 - seg(ph, s.loop - 0.18, s.loop));
+  let hide = 0; for (const [a, b] of (s.capHide || [])) hide = Math.max(hide, Math.min(seg(ph, a, a + 0.15), 1 - seg(ph, b - 0.15, b)));
+  capBox.style.opacity = eOutCubic(seg(ph, 0.1, 0.3)) * (1 - seg(ph, s.loop - 0.18, s.loop)) * (1 - hide);
+  markBox.style.opacity = 1 - hide;
   capBox.style.transform = `translateY(${(1 - eOutCubic(seg(ph, 0.1, 0.3))) * 0.4}rem)`;
   let txt = "", a = 0;
   const bs = s.beats || [];
@@ -311,7 +313,7 @@ window.renderAt = renderAt;
 /* QA: every registered subject must be either fully inside the frame (4 px margin)
    or fully outside, and must not overlap the visible caption blocks. */
 const SUBJECTS = [];
-function subject(obj, name) { SUBJECTS.push({ obj, name }); return obj; }
+function subject(obj, name, o = {}) { SUBJECTS.push({ obj, name, ...o }); return obj; }
 const _b = new THREE.Box3(), _c = new THREE.Vector3();
 function qa() {
   const W = innerWidth, H = innerHeight, out = [];
@@ -319,6 +321,10 @@ function qa() {
   if (+capBox.style.opacity > 0.02) rects.push(["caption", capBox.getBoundingClientRect()]);
   if (+beatBox.style.opacity > 0.02 && beatSpan.textContent) rects.push(["beat", beatSpan.getBoundingClientRect()]);
   scene.updateMatrixWorld(true);
+  const visChain = o => { while (o) { if (!o.visible) return false; o = o.parent; } return true; };
+  /* a name label may only be on screen with its mascot */
+  for (const s of SUBJECTS) if (s.owner && visChain(s.obj) && !visChain(s.owner)) out.push(`${s.name} shown without its mascot`);
+  const cardRects = [];
   for (const s of SUBJECTS) {
     let o = s.obj, vis = true; while (o) { if (!o.visible) { vis = false; break; } o = o.parent; }
     if (!vis) continue;
@@ -338,8 +344,15 @@ function qa() {
     if (!n) continue;
     const inside = x0 >= 4 && y0 >= 4 && x1 <= W - 4 && y1 <= H - 4;
     const outside = x1 < 0 || y1 < 0 || x0 > W || y0 > H;
-    if (!inside && !outside) out.push(`${s.name} cut by frame edge [${x0 | 0},${y0 | 0},${x1 | 0},${y1 | 0}]`);
-    for (const [n, r] of rects) if (x0 < r.right && x1 > r.left && y0 < r.bottom && y1 > r.top) out.push(`${s.name} under ${n}`);
+    const cropOk = typeof s.crop === "function" && s.crop(NOW);
+    if (!inside && !outside && !cropOk) out.push(`${s.name} cut by frame edge [${x0 | 0},${y0 | 0},${x1 | 0},${y1 | 0}]`);
+    for (const [n, r] of rects) if (x0 < r.right && x1 > r.left && y0 < r.bottom && y1 > r.top && !(n === "beat" && cropOk)) out.push(`${s.name} under ${n}`);
+    if (s.card) cardRects.push([s.name, x0, y0, x1, y1]);
+  }
+  /* cards must never touch each other (8 px gap) */
+  for (let i = 0; i < cardRects.length; i++) for (let j = i + 1; j < cardRects.length; j++) {
+    const [a, ax0, ay0, ax1, ay1] = cardRects[i], [b, bx0, by0, bx1, by1] = cardRects[j];
+    if (ax0 < bx1 + 8 && ax1 + 8 > bx0 && ay0 < by1 + 8 && ay1 + 8 > by0) out.push(`${a} touches ${b}`);
   }
   return out;
 }

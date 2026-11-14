@@ -55,7 +55,8 @@ function makeAgent(parent, o = {}) {
   let plate = null;
   if (o.name) { plate = label(g, [{ t: o.name, size: 0.2, weight: 700, color: o.nameColor ?? WHITE }],
       { w: Math.max(1.3, o.name.length * 0.135), h: 0.32, res: 300 });
-    plate.rotation.x = -Math.PI / 2 + 0.55; plate.position.set(0, 0.03, 0.72); }
+    plate.rotation.x = -Math.PI / 2 + 0.55; plate.position.set(0, 0.03, 0.72);
+    subject(plate, "label " + o.name, { owner: rig }); }
   /* a tag above the head (wallet standard etc.) */
   let tag = null;
   if (o.tag) { tag = label(g, o.tag, { w: 2.6, h: 0.62, res: 220, size: 0.21, gap: 0.25 });
@@ -85,7 +86,7 @@ function makeAgent(parent, o = {}) {
     shadow.scale.setScalar(Math.max(0.0001, 1 - Math.min(1, q.hop * 0.3)));
     shadow.visible = q.hop < 3;
     rig.visible = q.hop < 30;
-    if (plate) plate.visible = q.hop < 0.6 || (q.step != null);
+    if (plate) plate.visible = rig.visible && (q.hop < 0.6 || q.step != null);
     head.rotation.y = q.look; head.rotation.x = q.nod;
     eyes.scale.y = q.blink > 0.5 ? 0.15 : 1;
     tip.scale.setScalar(1 + 0.18 * Math.max(0, Math.sin(NOW * 2.1 + seed * 1.3)));
@@ -193,6 +194,10 @@ function makeStamp(parent, color = ACCENT) {
   obox(body, 0.12, 0.34, 0.12, 0x2a3140, 0, 0.29, 0, { olT: 0.03 });
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), mat(color)); hull(knob, 1.2);
   knob.position.y = 0.52; body.add(knob);
+  /* after it rebounds, the stamp leaves upward (world up) and shrinks, so the mark it made is
+     never covered: exit(a) is the offset; markAt is when the mark may show */
+  const markAt = 0.62;
+  function exit(ph, tDown) { const a = ph - tDown; return { up: eInCubic(seg(a, 0.35, 0.62)) * 1.4, s: 1 - seg(a, 0.45, 0.62) }; }
   /* returns the y offset above contact for time a = ph - tDown */
   function at(ph, tDown, rest = 0.9) {
     const a = ph - tDown;
@@ -206,7 +211,7 @@ function makeStamp(parent, color = ACCENT) {
     body.position.y = y; body.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
     return a >= 0;
   }
-  return { g, at };
+  return { g, at, exit, markAt };
 }
 
 /* a flat floor ring under a group of agents */

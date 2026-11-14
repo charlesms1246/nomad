@@ -53,6 +53,9 @@ registerScene({
       clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.0)] }));   /* nothing below the printer's slot */
     const feed = new THREE.Group(); PR.add(feed); feed.add(sheet); sheet.userData.noqa = true;
     sheet.position.z = 0.1;
+    /* invisible strip on the paper's top edge so the framing QA can see where the paper ends */
+    const topEdge = new THREE.Mesh(new THREE.BoxGeometry(PW, 0.12, 0.01), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+    topEdge.position.set(0, PH / 2 - 0.06, 0.1); feed.add(topEdge); subject(topEdge, "receipt top");
     let lastKey = "";
     function drawPaper(ph) {
       /* typed state: which lines are visible and how many hash characters */
@@ -117,9 +120,9 @@ registerScene({
       drawPaper(ph);
       /* the paper feeds up one line at a time: a quick mechanical step per line */
       let fed = 0;
-      fed += 0.75 * eOutCubic(seg(ph, 0.3, 0.6));
-      HASHES.forEach((x, i) => { const t0 = 1.0 + i * 2.2; fed += 0.62 * eOutCubic(seg(ph, t0 - 0.05, t0 + 0.25)) + 0.55 * eOutCubic(seg(ph, t0 + 0.3, t0 + 0.6)); });
-      fed += 0.35 * eOutCubic(seg(ph, 7.6, 7.9));
+      fed += 0.85 * eOutCubic(seg(ph, 0.3, 0.6));
+      HASHES.forEach((x, i) => { const t0 = 1.0 + i * 2.2; fed += 0.4 * eOutCubic(seg(ph, t0 - 0.05, t0 + 0.25)) + 0.38 * eOutCubic(seg(ph, t0 + 0.3, t0 + 0.6)); });
+      fed += 0.3 * eOutCubic(seg(ph, 7.6, 7.9));
       feed.position.set(0, 1.0 - PH / 2 + fed, 0.1);
       sheet.rotation.x = -0.04 * Math.sin(Math.min(1, fed / 4) * Math.PI);
       led.material.color.setHex(ph < 7.9 && Math.floor(ph * 6) % 2 === 0 ? ACCENT : 0x1b2130);

@@ -16,8 +16,8 @@ registerScene({
   kicks: [[0.5, 0.2], [1.75, 0.22], [2.45, 0.22], [3.15, 0.22], [4.7, 0.4], [6.5, 0.4], [8.3, 0.4]],
   shots: [
     [0, 3.55, { p: [0, 6.6, 8.6], l: [0, 0.7, 0], fov: 42 }, { p: [2.4, 6.0, 8.0], l: [0, 0.7, 0], fov: 42 }],
-    [3.55, 5.45, { p: [-2.1, 2.6, 8.9], l: [-2.9, 1.15, 1.15], fov: 34 }, { p: [-2.2, 2.55, 8.5], l: [-2.9, 1.15, 1.15], fov: 34 }],
-    [5.45, 7.25, { p: [2.1, 2.6, 8.9], l: [2.9, 1.15, 1.15], fov: 34 }, { p: [2.2, 2.55, 8.5], l: [2.9, 1.15, 1.15], fov: 34 }],
+    [3.55, 5.45, { p: [-1.1, 2.8, 9.8], l: [-0.9, 1.5, 0.6], fov: 38 }, { p: [-1.2, 2.75, 9.3], l: [-0.95, 1.5, 0.6], fov: 38 }],
+    [5.45, 7.25, { p: [1.1, 2.8, 9.8], l: [0.9, 1.5, 0.6], fov: 38 }, { p: [1.2, 2.75, 9.3], l: [0.95, 1.5, 0.6], fov: 38 }],
     [7.25, 9.05, { p: [0.3, 3.3, 8.6], l: [0, 0.95, -1.0], fov: 38 }, { p: [0.2, 3.2, 8.2], l: [0, 0.95, -1.0], fov: 38 }],
     [9.05, 12.5, { p: [0, 3.6, 9.0], l: [0, 1.35, 0], fov: 42 }, { p: [-1.4, 3.9, 8.5], l: [0, 1.3, 0], fov: 42 }],
   ],
@@ -28,8 +28,9 @@ registerScene({
     const arcT = [1.0, 1.7, 2.4];
     const stampT = [4.7, 6.5, 8.3];          /* signing order: a01, a03, a02 (follows the camera) */
     const cards = RING3.map((d, i) => {
-      const c = makeCard(g, [{ t: d.name, mono: true, weight: 700, size: 0.12 }, `gives ${d.gives}`, `gets ${d.gets}`], { w: 1.55, h: 0.7, size: 0.11 });
+      const c = makeCard(g, [{ t: d.name, mono: true, weight: 700, size: 0.12 }, `gives ${d.gives}`, `gets ${d.gets}`], { w: 1.75, h: 0.72, size: 0.11 });
       const s = makeStamp(g, ACCENT); s.g.rotation.x = Math.PI / 2;
+      subject(c.g, "card " + d.name, { card: true });
       return { c, s };
     });
     return { update(ph) {
@@ -50,15 +51,18 @@ registerScene({
         R.arcs[i].set(eInOut(seg(ph, arcT[k], arcT[k] + 0.75)));
         /* its card rises out of it, then the stamp */
         const { c, s } = cards[i];
+        /* every card floats in one row at the front agents' depth, over its owner's x: same size, never touching */
         const rise = eOutBack(seg(ph, 3.6 + k * 0.12, 4.15 + k * 0.12), 1.6);
-        c.g.position.set(P.x, lerp(0.9, 2.15, rise), P.z + 0.0);
+        const CX = [-2.1, 0, 2.1][i], CZ = 1.15;
+        c.g.position.set(lerp(P.x, CX, eOutCubic(seg(ph, 3.6 + k * 0.12, 4.15 + k * 0.12))), lerp(0.9, 2.45, rise), lerp(P.z, CZ, eOutCubic(seg(ph, 3.6 + k * 0.12, 4.15 + k * 0.12))));
         c.g.scale.setScalar(Math.max(0.0001, rise));
-        c.g.rotation.y = -P.x * 0.05;
-        const landed = s.at(ph, st, 0.5);
-        s.g.position.set(P.x + c.mark.position.x, c.g.position.y + c.mark.position.y, P.z + 0.06);
-        const vis = win(ph, st - 1.0, st - 0.8, st + 0.75, st + 1.0);
+        c.g.rotation.y = 0;
+        s.at(ph, st, 0.5);
+        const ex = s.exit(ph, st);
+        s.g.position.set(c.g.position.x + c.mark.position.x, c.g.position.y + c.mark.position.y + ex.up, c.g.position.z + 0.06);
+        const vis = Math.min(seg(ph, st - 1.0, st - 0.8), ex.s);
         s.g.scale.setScalar(Math.max(0.0001, vis)); s.g.visible = vis > 0.001;
-        c.setMark(landed ? eOutBack(seg(ph, st, st + 0.25), 2.5) : 0);
+        c.setMark(ph > st + s.markAt ? eOutBack(seg(ph, st + s.markAt, st + s.markAt + 0.22), 2.5) : 0);
         /* the card dips under the stamp */
         const dip = ph > st && ph < st + 0.5 ? Math.exp(-(ph - st) * 10) * Math.sin((ph - st) * 25) * 0.05 : 0;
         c.flip.rotation.x = -dip * 2; c.flip.position.z = -dip;
