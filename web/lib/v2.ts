@@ -248,3 +248,66 @@ export async function verifyV2Ring(ring: V2Ring, override?: CloseTx): Promise<V2
 const key = (ringId: string) => `v2:${ringId}`;
 export const recheckV2 = (ring: V2Ring, override?: CloseTx) => runCheck(key(ring.id), () => verifyV2Ring(ring, override));
 export const useV2Check = (ringId: string): CheckState<V2Verification> => useCheck<V2Verification>(key(ringId));
+
+/* ---------- erc191 legs that are not a plain hot wallet ---------- */
+// (a) Mandate-controlled: the 0x address belongs to mandate.nomadswarm.testnet, which signs legs through
+//     Chain Signatures (MPC) within on-chain limits; no hot key exists. The contract can only be asked
+//     per owner (`mandate({owner})`), so we look up every NEAR account we can see and match eth_address.
+// (b) ERC-7683 order: the rings contract stores an EIP-712-verified GaslessCrossChainOrder for
+//     (user, give, want); `order_for` returns it.
+
+export const MANDATE_CONTRACT = "mandate.nomadswarm.testnet";
+
+export interface MandateTokenRule {
+  token: string;
+  max_per_leg: string;
+  daily_budget: string;
+}
+export interface MandatePriceRule {
+  give: string;
+  want: string;
+  rate_num: string;
+  rate_den: string;
+}
+export interface Mandate {
+  owner: string;
+  path: string;
+  eth_address: string;
+  address_verified: boolean;
+  tokens: MandateTokenRule[];
+  prices: MandatePriceRule[];
+  min_counterparty_reputation: number | null;
+  expires_at_ms: number;
+  spent: { token: string; day: number; amount: string }[];
+  legs_signed: number;
+}
+export interface MandateConfig {
+  verifier_id: string;
+  mpc_id: string;
+}
+
+export interface Erc7683Order {
+  id: string;
+  input: { user: string; nonce: string; open_deadline: number; fill_deadline: number; give: string; give_amount: string; want: string; min_want_amount: string };
+  filled: string;
+  digest: string;
+}
+
+export const fetchMandateConfig = () => viewCall<MandateConfig>(MANDATE_CONTRACT, "config");
+
+const isNearName = (id: string) => !/^0x[0-9a-f]{40}$/i.test(id) && !/^[0-9a-f]{64}$/.test(id);
+
+/** eth_address (lowercase) -> mandate, for every owner among the given accounts. */
+export async function fetchMandates(accounts: string[]): Promise<Map<string, Mandate>> {
+  const owners = [...new Set(["nomadswarm.testnet", ...accounts.filter(isNearName)])];
+  const found = await Promise.all(owners.map((owner) => viewCall<Mandate | null>(MANDATE_CONTRACT, "mandate", { owner }).catch(() => null)));
+  const m = new Map<string, Mandate>();
+  for (const x of found) if (x) m.set(x.eth_address.toLowerCase(), x);
+  return m;
+}
+
+export const fetchOrder = (user: string, give: string, want: string) =>
+  viewCall<Erc7683Order | null>(RINGS_CONTRACT, "order_for", { user, give, want }).catch(() => null);
+
+/** UTC day index the mandate uses for its daily budget. */
+export const mandateDay = (ms: number) => Math.floor(ms / 86_400_000);

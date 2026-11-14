@@ -7,14 +7,21 @@ import {
   RINGS_CONTRACT,
   V2_TOKENS,
   VERIFIER,
+  MANDATE_CONTRACT,
   fetchConfig,
+  fetchMandateConfig,
+  fetchMandates,
+  fetchOrder,
   fetchReputation,
   fetchRings,
+  mandateDay,
   isStranger,
   recheckV2,
   shortId,
   useV2Check,
   walletOf,
+  type Erc7683Order,
+  type Mandate,
   type V2Config,
   type V2Reputation,
   type V2Ring,
@@ -46,9 +53,9 @@ function Acct({ id, className = "" }: { id: string; className?: string }) {
   );
 }
 
-function WalletBadge({ standard, agent }: { standard: string | null; agent: string }) {
-  const w = walletOf(standard, agent);
-  const c = WALLET_COLOR[w.label] ?? "#898781";
+function WalletBadge({ standard, agent, label }: { standard: string | null; agent: string; label?: string }) {
+  const w = { ...walletOf(standard, agent), ...(label ? { label } : {}) };
+  const c = WALLET_COLOR[walletOf(standard, agent).label] ?? "#898781";
   return (
     <span
       className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px]"
@@ -131,9 +138,61 @@ function CheckResult({ ix, ring, r }: { ix: TokenIndex; ring: V2Ring; r: V2Verif
   );
 }
 
-function RingCard({ ix, ring, auto }: { ix: TokenIndex; ring: V2Ring; auto: boolean }) {
+interface Extras {
+  mandates: Map<string, Mandate>; // eth_address (lowercase) -> mandate
+  mpc: string | null; // Chain Signatures contract the mandate signs through
+  orders: Map<string, Erc7683Order | null>; // `${agent}|${give}|${get}` -> order
+}
+const orderKey = (agent: string, give: string, get: string) => `${agent.toLowerCase()}|${give}|${get}`;
+const isErc191Leg = (ring: V2Ring, i: number) => ring.standards[i] === "erc191" || (!ring.standards[i] && /^0x[0-9a-f]{40}$/i.test(ring.legs[i].agent));
+
+/** Human rate: rate_num/rate_den is in smallest units of want per give. */
+function humanRate(ix: TokenIndex, give: string, want: string, num: string, den: string): string {
+  const dg = ix.get(give)?.decimals ?? 0;
+  const dw = ix.get(want)?.decimals ?? 0;
+  const r = (Number(num) / Number(den)) * 10 ** (dg - dw);
+  return r.toLocaleString("en-US", { maximumSignificantDigits: 6 });
+}
+
+function mandateText(ix: TokenIndex, m: Mandate, mpc: string | null): string[] {
+  const today = mandateDay(Date.now());
+  const sym = (t: string) => ix.get(t)?.symbol ?? t;
+  return [
+    `Controlled by ${MANDATE_CONTRACT} for ${m.owner} through Chain Signatures${mpc ? ` (${mpc})` : ""}: no hot key exists for this address${m.address_verified ? "; the MPC address was verified on chain" : ""}.`,
+    ...m.tokens.map((t) => {
+      const spent = m.spent.find((x) => x.token === t.token && x.day === today)?.amount ?? "0";
+      return `${sym(t.token)}: at most ${fmtAmt(ix, t.token, t.max_per_leg)} per leg, ${fmtAmt(ix, t.token, t.daily_budget)} per day (spent today ${fmtAmt(ix, t.token, spent)}).`;
+    }),
+    ...m.prices.map((p) => `Min price: ${humanRate(ix, p.give, p.want, p.rate_num, p.rate_den)} ${sym(p.want)} per ${sym(p.give)}.`),
+    `Expires ${time(m.expires_at_ms)} · ${m.legs_signed} legs signed so far.`,
+  ];
+}
+
+function orderText(ix: TokenIndex, o: Erc7683Order): string[] {
+  return [
+    `ERC-7683 order ${o.id.slice(0, 8)}: give ${fmtAmt(ix, o.input.give, o.input.give_amount)}, min want ${fmtAmt(ix, o.input.want, o.input.min_want_amount)}, filled ${fmtAmt(ix, o.input.give, o.filled)}, fill deadline ${time(o.input.fill_deadline * 1000)}.`,
+    "Order format: ERC-7683 (earlier draft) GaslessCrossChainOrder, EIP-712 verified on chain.",
+  ];
+}
+
+function SpecialBadge({ label, color, lines }: { label: string; color: string; lines: string[] }) {
+  return (
+    <span
+      className="ml-1.5 inline-flex cursor-help items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium"
+      style={{ background: `${color}22`, color, border: `1px solid ${color}55` }}
+      title={lines.join("\n")}
+    >
+      {label}
+    </span>
+  );
+}
+
+function RingCard({ ix, ring, auto, extras }: { ix: TokenIndex; ring: V2Ring; auto: boolean; extras: Extras | null }) {
   const v = useV2Check(ring.id);
-  const s = STATUS_STYLE[ring.status];
+  // The contract refuses attach/close after the deadline; an Open ring past it can no longer settle.
+  const [now] = useState(() => Date.now());
+  const expired = ring.status === "Open" && ring.deadline_ms < now;
+  const s = expired ? { c: "#5c5b57", icon: "⌛", label: "expired" } : STATUS_STYLE[ring.status];
   const closed = ring.status === "Settled" || ring.status === "Failed";
   const stranger = isStranger(ring);
   const tips: Diff = {};
@@ -191,7 +250,17 @@ function RingCard({ ix, ring, auto }: { ix: TokenIndex; ring: V2Ring; auto: bool
                 <Acct id={l.agent} />
               </td>
               <td className="py-2 pr-3">
-                <WalletBadge standard={ring.standards[i] ?? null} agent={l.agent} />
+                <WalletBadge
+                  standard={ring.standards[i] ?? null}
+                  agent={l.agent}
+                  label={extras?.mandates.has(l.agent.toLowerCase()) ? "Ethereum address" : undefined}
+                />
+                {extras?.mandates.get(l.agent.toLowerCase()) && (
+                  <SpecialBadge label="Mandate (Chain Signatures)" color="#199e70" lines={mandateText(ix, extras.mandates.get(l.agent.toLowerCase())!, extras.mpc)} />
+                )}
+                {isErc191Leg(ring, i) && extras?.orders.get(orderKey(l.agent, l.give, l.get)) && (
+                  <SpecialBadge label="ERC-7683 order" color="#c98500" lines={orderText(ix, extras.orders.get(orderKey(l.agent, l.give, l.get))!)} />
+                )}
               </td>
               <td className="py-2 pr-3 tabular-nums text-[#c3c2b7]" title={fmtAmt(ix, l.give, l.give_amt, 99)}>{fmtAmt(ix, l.give, l.give_amt)}</td>
               <td className="py-2 pr-3 tabular-nums text-[#c3c2b7]" title={fmtAmt(ix, l.get, l.get_amt, 99)}>{fmtAmt(ix, l.get, l.get_amt)}</td>
@@ -204,11 +273,25 @@ function RingCard({ ix, ring, auto }: { ix: TokenIndex; ring: V2Ring; auto: bool
         </tbody>
       </table>
 
+      {extras &&
+        ring.legs.map((l, i) => {
+          const m = extras.mandates.get(l.agent.toLowerCase());
+          const o = isErc191Leg(ring, i) ? extras.orders.get(orderKey(l.agent, l.give, l.get)) : null;
+          if (!m && !o) return null;
+          return (
+            <div key={`note-${i}`} className="mt-2 rounded-md border border-white/5 bg-[#141413] px-3 py-2 text-[11px] leading-relaxed text-[#898781]">
+              <span className="text-[#c3c2b7]">{shortId(l.agent)}</span>
+              {m && <> · {mandateText(ix, m, extras.mpc).join(" ")}</>}
+              {o && <> · {orderText(ix, o).join(" ")}</>}
+            </div>
+          );
+        })}
+
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-[#898781]">
         <span>
           {attached}/{ring.legs.length} legs attached · tips {ring.status === "Settled" ? "paid" : "offered"}: {sumTips(ix, tips)}
           {ring.close_attempts > 1 ? ` · ${ring.close_attempts} close attempts` : ""}
-          {ring.status === "Open" ? ` · expires ${time(ring.deadline_ms).slice(11)}` : ""}
+          {ring.status === "Open" ? ` · ${expired ? "expired" : "expires"} ${time(ring.deadline_ms).slice(11)}` : ""}
         </span>
         {closed && (
           <button
@@ -330,6 +413,29 @@ export default function V2Rings() {
   const [err, setErr] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [auto, setAuto] = useState(false);
+  const [extras, setExtras] = useState<Extras | null>(null);
+
+  // Mandates and ERC-7683 orders for the loaded rings (re-read when the set of legs changes).
+  const legKey = rings?.map((r) => r.id + r.standards.join()).join(",") ?? "";
+  useEffect(() => {
+    if (!rings) return;
+    let stop = false;
+    const accounts = rings.flatMap((r) => [r.proposer, ...(r.closer ? [r.closer] : []), ...r.legs.map((l) => l.agent)]);
+    const want = new Map<string, [string, string, string]>();
+    rings.forEach((r) => r.legs.forEach((l, i) => isErc191Leg(r, i) && want.set(orderKey(l.agent, l.give, l.get), [l.agent, l.give, l.get])));
+    Promise.all([
+      fetchMandates(accounts),
+      fetchMandateConfig().then((c) => c.mpc_id, () => null),
+      Promise.all([...want].map(async ([k, [a, g, w]]) => [k, await fetchOrder(a, g, w)] as const)),
+    ]).then(
+      ([mandates, mpc, orders]) => !stop && setExtras({ mandates, mpc, orders: new Map(orders) }),
+      () => {},
+    );
+    return () => {
+      stop = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legKey]);
 
   const load = useCallback(async () => {
     try {
@@ -408,7 +514,7 @@ export default function V2Rings() {
             </header>
             {rings.length === 0 && <p className="text-sm text-[#898781]">No rings yet.</p>}
             {rings.map((r) => (
-              <RingCard key={r.id} ix={ix} ring={r} auto={auto} />
+              <RingCard key={r.id} ix={ix} ring={r} auto={auto} extras={extras} />
             ))}
           </section>
           <ReputationTable rings={rings} />
