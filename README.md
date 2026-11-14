@@ -27,7 +27,7 @@ Output below was captured from this repo on 2026-11-14.
 | 2 | `make dry-run` | `ring-3.json: simulate_intents on intents.nomadswarm.testnet: 4 intents_executed (3 agents + matcher)`, then the same for ring-4 (5) and ring-5 (6). This is a read-only call to our testnet Verifier with committed signed fixtures |
 | 3 | `make colo-check` | `OK: intents-matcher.nomadswarm.testnet shard 7, intents.nomadswarm.testnet shard 7`, read from the live shard layout. `node packages/colo/dist/cli.js where <account>` prints any account's shard |
 | 4 | `make test` | Each TypeScript package reports `Tests N passed`: 108 passed, with 4 live-network tests skipped. Then the board's Rust tests report `test result: ok. 40 passed` |
-| 5 | `cd web && npm install && npm run dev` | The UI at http://localhost:3000. With no `MATCHER_URL` set, it shows a fixture labelled **MOCK DATA**. `make sim-serve` plus `make ui` shows a running simulation instead |
+| 5 | `cd web && npm install && npm run dev` | The UI at http://localhost:3000. With no reachable `MATCHER_URL`, it shows a recorded real testnet state (a 3-way race capture, with real tx links) labelled **Recorded testnet data · 2026-11-13 23:53 UTC**. `make sim-serve` plus `make ui` shows a running simulation, labelled **Simulation**. `MATCHER_URL=http://localhost:1 make ui-check` prints `ui-check: source=recorded agents=12 rings=18 settled=6` |
 | 6 | Testnet proof | The tx links under [Deployments](#deployments) |
 
 `pnpm install && pnpm test` also works: the root `test` script builds the packages first.
@@ -55,7 +55,7 @@ Output below was captured from this repo on 2026-11-14.
 | LLM mode (NEAR AI Cloud sets an agent's margin; `legCheck` still decides every signature) | [apps/agent/src/llm.ts](apps/agent/src/llm.ts) | [llm.test.ts](apps/agent/test/llm.test.ts) against a mocked API, including clamping to [0, 5%]. Not run against the live API: it needs `LLM=1 NEARAI_API_KEY=…`, and we had no key |
 | Signed fixtures for `make dry-run` | [fixtures/rings](fixtures/rings), signed by `make fixtures` | Signed by dedicated agents `fx01`–`fx12` (`make fixture-accounts`), so live trading never drains them |
 | House of Stake spend budgets (stretch) | [scripts/hos-budget.ts](scripts/hos-budget.ts), [contracts/hos/build.sh](contracts/hos/build.sh) | [docs/HOS_BUDGETS.md](docs/HOS_BUDGETS.md), [hos-budget.json](docs/measurements/hos-budget.json); limits in [docs/research/HOS_LIMITS.md](docs/research/HOS_LIMITS.md) |
-| UI: ring graph, rings table, swarm and race panels | [web/components](web/components), API shape in [web/lib/types.ts](web/lib/types.ts) | `cd web && npm run build`; `make ui-check` (sim matcher + local dev UI + headless screenshot to `out/ui-check/ui.png`) |
+| UI: ring graph, rings table, swarm and race panels | [web/components](web/components), API shape in [web/lib/types.ts](web/lib/types.ts) | `cd web && npx next build`; `make ui-check` (sim matcher + local dev UI + headless screenshot to `out/ui-check/ui.png`) |
 | Matcher container (read-only public API) | [apps/matcher/Dockerfile](apps/matcher/Dockerfile), [apps/matcher/src/server.ts](apps/matcher/src/server.ts) | [docs/DEPLOY.md](docs/DEPLOY.md): with `PUBLIC=1`, only `GET /api/state` and `/healthz` are served |
 
 ## What is real vs simulated
@@ -68,7 +68,7 @@ Output below was captured from this repo on 2026-11-14.
 | Agents | `a01`–`a12.nomadswarm.testnet`, each with its own Verifier key | Sim agents are in-process |
 | Fallback execution through 1Click | Refused on testnet by design (1Click is mainnet-only) | Quotes only |
 | LLM mode | Coded and unit-tested against a mocked API | Not run against the live NEAR AI Cloud API |
-| UI | Reads the matcher's `/api/state` | With no reachable matcher, a fixture labelled MOCK DATA |
+| UI | Reads the matcher's `/api/state` (badge LIVE). With no reachable matcher, a recorded real testnet state from 2026-11-13 23:53 UTC ([web/lib/live-snapshot.json](web/lib/live-snapshot.json)), labelled as recorded | With `make sim-serve`, simulated state labelled Simulation. `?mock=1` serves an invented layout fixture for UI development only |
 
 ## NEAR primitives used, and why
 
