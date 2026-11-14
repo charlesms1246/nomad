@@ -1,0 +1,50 @@
+{
+  "note": "ERC-7683 (earlier draft) GaslessCrossChainOrder for one Nomad leg, EIP-712 signed. Conventions: packages/intents/src/erc7683.ts. Regenerate: pnpm --filter @nomad/intents exec tsx scripts/erc7683-vector.ts",
+  "types": {
+    "EIP712Domain": "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
+    "GaslessCrossChainOrder": "GaslessCrossChainOrder(address originSettler,address user,uint256 nonce,uint256 originChainId,uint32 openDeadline,uint32 fillDeadline,bytes32 orderDataType,bytes orderData)",
+    "NomadLeg": "NomadLeg(string give,uint256 giveAmount,string want,uint256 minWantAmount)"
+  },
+  "typehashes": {
+    "EIP712Domain": "0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f",
+    "GaslessCrossChainOrder": "0xe3bf10b5739e335154720a95c12f13044f17663dbd6ca01ac402fbc114960ecd",
+    "NomadLeg": "0x7c6a8b6d283814405267abffd32b48f27b370891b76bedf2e8c7d7ecc39640d4"
+  },
+  "domain": {
+    "name": "Nomad",
+    "version": "1",
+    "chainId": "398",
+    "verifyingContract": "0x0000000000000000000000000000000000000000"
+  },
+  "domainSeparator": "0x89a6cf11dc07b6db253205e985e3fba45a979515c2353d3935aa39bb5a169e89",
+  "leg": {
+    "give": "nep141:usdc.nomadswarm.testnet",
+    "giveAmount": "1000000",
+    "want": "nep141:wnear.nomadswarm.testnet",
+    "minWantAmount": "285000000000000000000000"
+  },
+  "order": {
+    "originSettler": "0x0000000000000000000000000000000000000000",
+    "user": "0x057967686457f73514ee64905eee88ff1754814f",
+    "nonce": "38971282028465232006400089065225703897049681715557989119841652574346541862415",
+    "originChainId": "398",
+    "openDeadline": 1794700000,
+    "fillDeadline": 1794700120,
+    "orderDataType": "0x7c6a8b6d283814405267abffd32b48f27b370891b76bedf2e8c7d7ecc39640d4",
+    "orderData": "0x000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000f424000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000003c59e1867548d8200000000000000000000000000000000000000000000000000000000000000000001e6e65703134313a757364632e6e6f6d6164737761726d2e746573746e65740000000000000000000000000000000000000000000000000000000000000000001f6e65703134313a776e6561722e6e6f6d6164737761726d2e746573746e657400"
+  },
+  "orderDataHash": "0xfa813ce7602df82d2e460749a2a573636f1825aa0a6a51df9e55897e74eb258b",
+  "structHash": "0xdcb16b80a41e6bff4aa8693ba4bdc5d85be1879e6350caa50049d4d71cfb5e32",
+  "digest": "0x53b36e61187771c3e20176d5660889211fcdac294a15f218759af8a974b3cbcc",
+  "signingKey": {
+    "privateKey": "0xabc769981415b25527ee06f257d91691bae50fdc880033f03083d615f3c773a7",
+    "address": "0x057967686457f73514ee64905eee88ff1754814f",
+    "warning": "test key, public, never fund"
+  },
+  "signature": {
+    "r": "0x567511aaa9d4ab38129d4c2bf89812929bc1e4089cde4b0f37839951fe999f01",
+    "s": "0x60e5527f9bad438783f896526add0cb1867b7d9eacaa3e3666b40f7eaa78bb21",
+    "v": 28,
+    "rsv": "0x567511aaa9d4ab38129d4c2bf89812929bc1e4089cde4b0f37839951fe999f0160e5527f9bad438783f896526add0cb1867b7d9eacaa3e3666b40f7eaa78bb211c"
+  }
+}

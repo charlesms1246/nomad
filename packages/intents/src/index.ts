@@ -8,3 +8,4 @@ export * from './rpc.js';
 export * from './client.js';
 export * from './credentials.js';
 export * from './standards.js';
+export * from './erc7683.js';
