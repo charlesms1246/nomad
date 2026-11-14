@@ -1,9 +1,9 @@
 // Stitch the demo video (silent, 1920x1080, 30 fps, H.264):
-//   cold open (the scene-3 settle with one line on screen) -> deck scenes 0-4 -> the real site (landing hero, ring
+//   cold open (the scene-3 settle with one line on screen) -> logo sting -> deck scenes 0-4 -> the real site (landing hero, ring
 //   replay, /dashboard workshop, /v2?verify=1) -> deck scene 5 -> the proof figures -> end card.
 //   node scripts/stitch-demo.mjs [in dir = out/demo] [out = out/demo/nomad-demo.mp4]
 // Inputs: deck-s0..s5.mp4 and cold-s3.mp4 (scripts/render-demo.mjs; cold-s3 is scene 3 from 3.0 s with DECK_QUERY=nocap),
-// web-*.mp4 and web-v2.json (scripts/record-site.mjs), cards/*.png (scripts/demo-cards.mjs).
+// web-*.mp4 and web-v2.json (scripts/record-site.mjs), cards/*.png (scripts/demo-cards.mjs), logo-*.mp4 (scripts/demo-logo.mjs).
 // Cuts are hard. Website shots and cards get a slow push-in (zoompan on a 4K upscale, so the motion stays smooth)
 // toward the element that matters; the replay keeps each stage's moment of change and drops the still tails.
 // Prints the start/end of every block (the timing sheet's skeleton).
@@ -19,6 +19,7 @@ const v2 = JSON.parse(readFileSync(join(dir, "web-v2.json"), "utf8"));
    optional overlay png faded in at a time */
 const BLOCKS = [
   { name: "Cold open: the settle", file: "cold-s3.mp4", pieces: [[0.3, 3.7]], overlay: { png: "cards/cold-title.png", at: 0.15 } },
+  { name: "Logo sting", file: "logo-sting.mp4", pieces: [[0, 1.0]] },
   { name: "Scene 0: the need", file: "deck-s0.mp4", pieces: [[0, 8.2]] },
   { name: "Scene 1: pairs fail", file: "deck-s1.mp4", pieces: [[0, 8.6]] },
   { name: "Scene 2: the loop", file: "deck-s2.mp4", pieces: [[0, 11.6]] },
@@ -33,7 +34,7 @@ const BLOCKS = [
   { name: "Figure: 27 rings settled, 0 failed", png: "cards/num-1.png", secs: 2.4, zoom: [1.0, 1.06, 0.5, 0.45] },
   { name: "Figure: 3 wallet standards in one ring", png: "cards/num-2.png", secs: 2.4, zoom: [1.0, 1.06, 0.5, 0.45] },
   { name: "Figure: 0 access keys", png: "cards/num-3.png", secs: 2.4, zoom: [1.0, 1.06, 0.5, 0.45] },
-  { name: "End card", png: "cards/end.png", secs: 4, zoom: [1.0, 1.04, 0.5, 0.5], fadeOut: 0.6 },
+  { name: "End card", file: "logo-end.mp4", pieces: [[0, 4.0]], zoom: [1.0, 1.03, 0.5, 0.5], fadeOut: 0.6 },
 ];
 
 const inputs = [], chains = [];
