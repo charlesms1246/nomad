@@ -61,10 +61,17 @@ export class NearRpc {
     let lastErr: unknown;
     for (let i = 0; i <= retries; i++) {
       try {
+        // Client-side timeout: a stalled RPC connection must not hang the caller forever.
+        // send_tx waits for execution, so it gets longer; a timeout surfaces as "fetch failed",
+        // which sendTx handles by polling the tx status (no double-send: same signed bytes).
         const r = await fetch(this.urls[this.cur % this.urls.length]!, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 'nomad', method, params }),
+          signal: AbortSignal.timeout(method === 'send_tx' ? 70_000 : 20_000),
+        }).catch((e: unknown) => {
+          if ((e as Error)?.name === 'TimeoutError' || (e as Error)?.name === 'AbortError') throw new RpcError(`fetch failed: client timeout on ${method}`);
+          throw e;
         });
         if (r.status === 429 || r.status >= 500) throw new RpcError(`HTTP ${r.status}`);
         const j: any = await r.json();
