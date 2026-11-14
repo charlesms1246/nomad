@@ -10,7 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { AgentRuntime, BoardClient, rngFrom, type Offer, type StrategyName, type TokenInfo } from "@nomad/agent";
-import { findRings, type Ring as FoundRing } from "@nomad/ringfinder";
+import { findRings, sizeRing, ringIdOf, type Ring as FoundRing } from "@nomad/ringfinder";
 import { NearRpc, signerFor, TESTNET_RPC } from "@nomad/intents";
 import { check } from "@nomad/colo";
 import { baseline, buildTokenMap, getTokens, type TokenSymbol } from "@nomad/oneclick";
@@ -96,6 +96,7 @@ async function main() {
           sizeFrac: 0.4 + rng() * 0.4,
           ttlMs: 10 * 60_000,
           verifierId: cfg.verifierId,
+          auctionMs: +env("AUCTION_MS", "0"),
         },
         liveSigner({ signerId: id, secretKey: ik.secretKey }),
         (ts) => readChain.balances(id, ts),
@@ -149,7 +150,18 @@ async function main() {
   if (SUBMIT_AS_VERIFIER) prod.opts.txSigner = cfg.verifierId;
   const racers: { m: Matcher; label: string; txSigner: string }[] = [{ m: prod, label: prodId, txSigner: SUBMIT_AS_VERIFIER ? cfg.verifierId : prodId }];
   if (RACE) racers.push({ m: mk(ctrlId), label: ctrlId, txSigner: ctrlId });
-  if (RACE_N >= 3) racers.push({ m: mk(relayerMatcherId, relayerChain()), label: `${relayerMatcherId} (signs as ${cfg.verifierId})`, txSigner: cfg.verifierId });
+  // FEE_RACE=1: the third matcher submits with its own key too (equal latency), so only the fee differs
+  const FEE_RACE = env("FEE_RACE", "0") === "1";
+  if (RACE_N >= 3 && FEE_RACE) racers.push({ m: mk(relayerMatcherId), label: relayerMatcherId, txSigner: relayerMatcherId });
+  else if (RACE_N >= 3) racers.push({ m: mk(relayerMatcherId, relayerChain()), label: `${relayerMatcherId} (signs as ${cfg.verifierId})`, txSigner: cfg.verifierId });
+  // RACE_PHI="0.05,0.2,0.35": each racing matcher's share of the ring surplus
+  const phis = env("RACE_PHI", "").split(",").filter(Boolean).map(Number);
+  racers.forEach((x, i) => {
+    if (phis[i] !== undefined) {
+      x.m.opts.phi = phis[i];
+      x.label = `${x.label} · fee ${Math.round(phis[i]! * 100)}% of surplus`;
+    }
+  });
   for (const { m, label, txSigner } of racers) {
     if (txSigner !== m.opts.account) m.opts.txSigner = txSigner;
     const c = await check({ account: txSigner, target: cfg.verifierId }, { network: "testnet" });
@@ -261,7 +273,16 @@ async function main() {
         race.rounds++;
         // every matcher gets the same ring at the same moment; agents sign each with the same per-offer nonce,
         // so exactly one batch can execute and the rest fail with "nonce was already used"
-        const res = await Promise.all(racers.map((x, i) => x.m.settle(i === 0 ? r : ({ ...r, ringId: r.ringId.slice(0, 62) + "r" + i } as FoundRing))));
+        // each matcher sizes the same cycle of offers with its own fee share (phi)
+        const cycle = r.legs.map((l) => book.find((o) => o.id === l.offerId)!);
+        const variant = (i: number): FoundRing => {
+          if (i === 0) return r;
+          const phi = racers[i]!.m.opts.phi ?? 0.2;
+          if (phi === (prod.opts.phi ?? 0.2)) return { ...r, ringId: r.ringId.slice(0, 62) + "r" + i };
+          const sized = sizeRing(cycle, { feePips: fee, phi, priceUsd: prod.opts.priceUsd, decimals: prod.opts.decimals });
+          return sized ? { ...sized, ringId: ringIdOf(sized.legs, sized.matcherLeg, `race:${round}:${i}`) } : { ...r, ringId: r.ringId.slice(0, 62) + "r" + i };
+        };
+        const res = await Promise.all(racers.map((x, i) => x.m.settle(variant(i))));
         res.forEach((x, i) => {
           const m = race.matchers[i]!;
           if (x.status === "settled") {
