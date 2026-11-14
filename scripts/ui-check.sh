@@ -43,9 +43,17 @@ SHOT="$(find "$HOME/Library/Caches/ms-playwright" -name chrome-headless-shell -t
 if [[ -n "$SHOT" ]]; then
   # Real-time screenshots via the DevTools Protocol (scripts/cdp-shot.mjs, Node built-ins only):
   # the landing page's reveal and WebGL background need real time to finish.
+  # Screenshots are diagnostics, not the check: a failed one is retried once, then skipped.
   shot() { # name width height path [waitMs] [fullPage] [reduced] [scroll]
-    node "$ROOT/scripts/cdp-shot.mjs" "$SHOT" "http://localhost:$UI_PORT$4" "$ROOT/out/ui-check/$1.png" "$2" "$3" "${5:-5000}" "${6:-0}" "${7:-0}" "${8:-0}" | sed 's/^/ui-check: /'
+    local args=("$ROOT/scripts/cdp-shot.mjs" "$SHOT" "http://localhost:$UI_PORT$4" "$ROOT/out/ui-check/$1.png" "$2" "$3" "${5:-5000}" "${6:-0}" "${7:-0}" "${8:-0}")
+    if out="$(node "${args[@]}" 2>&1)" || out="$(node "${args[@]}" 2>&1)"; then
+      echo "ui-check: ${out%%$'\n'*}"
+    else
+      echo "ui-check: screenshot $1 skipped (${out%%$'\n'*})"
+    fi
   }
+  # Compile each route before shooting it (a cold dev compile can outlast the screenshot).
+  for r in / /dashboard /v2; do curl -s -o /dev/null "http://localhost:$UI_PORT$r" || true; done
   shot ui 1440 900 /dashboard 5000 0                  # the matcher dashboard (was at / before the landing page)
   shot landing-1440 1440 900 /
   shot landing-390 390 844 /
