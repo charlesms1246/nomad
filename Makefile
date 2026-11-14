@@ -8,7 +8,7 @@
 #   make live       matcher + agents on testnet (needs keys from `make accounts`)
 #   make race       two matchers (Verifier's shard vs another shard) on the same offers
 #   make fixtures   sign fresh demo rings for dry-run
-#   make kill-tests K1..K8 against the testnet Verifier, results -> docs/MEASUREMENTS.md
+#   make kill-tests K1..K8 against the testnet Verifier (needs the team's testnet keys)
 
 SHELL := /bin/bash
 NODE_OPTIONS ?= --dns-result-order=ipv4first

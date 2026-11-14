@@ -88,5 +88,6 @@ out.verdict = pass
   ? "PASS: a ring with a mandate-checked, MPC-signed (erc191) leg and a nep413 leg settled through the rings contract, closed by a stranger"
   : "FAIL: see fields";
 console.log("ring", ring.status, ring.standards.join(","), "\n" + out.verdict);
+fs.mkdirSync(path.join(ROOT, "docs/measurements"), { recursive: true });
 fs.writeFileSync(path.join(ROOT, "docs/measurements/rings-mandate-e2e.json"), JSON.stringify(out, null, 1));
 process.exit(pass ? 0 : 1);

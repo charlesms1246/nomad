@@ -134,5 +134,6 @@ out.verdict = pass
   ? "PASS: an EIP-712 ERC-7683 order was verified on chain (ecrecover), a ring below its price was rejected, a ring at its price settled with the wallet's erc191 leg, and the order was filled"
   : "FAIL: see fields";
 console.log(out.verdict);
+fs.mkdirSync(path.join(ROOT, "docs/measurements"), { recursive: true });
 fs.writeFileSync(path.join(ROOT, "docs/measurements/rings-order-e2e.json"), JSON.stringify(out, null, 1));
 process.exit(pass ? 0 : 1);

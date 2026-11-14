@@ -24,4 +24,5 @@ for (const acct of accounts) {
   report[acct] = { codeHash: before.code_hash, deleteTxs: txs, remainingKeys: left.map((k: any) => ({ key: k.public_key, permission: k.access_key.permission })) };
   console.log(`${acct}: code ${before.code_hash}, remaining keys ${JSON.stringify(left.map((k: any) => k.access_key.permission))}`);
 }
+fs.mkdirSync(path.join(ROOT, "docs/measurements"), { recursive: true });
 fs.writeFileSync(path.join(ROOT, "docs/measurements/contract-locks.json"), JSON.stringify(report, null, 1));

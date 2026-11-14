@@ -11,7 +11,6 @@ COPY packages ./packages
 COPY apps/agent ./apps/agent
 COPY apps/matcher ./apps/matcher
 COPY config ./config
-COPY RULES.md ./
 RUN pnpm install --frozen-lockfile --filter "./packages/*" --filter "./apps/*" \
  && pnpm -r --filter "./packages/*" --filter "./apps/*" build
 ENV NODE_OPTIONS=--dns-result-order=ipv4first HOST=0.0.0.0 PORT=8080 MODE=sim PUBLIC=1

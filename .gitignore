@@ -12,3 +12,11 @@ out/*
 .DS_Store
 *.log
 .taste-skill/
+
+# Docs are kept locally only (not published); README.md is the one public doc
+docs/
+STATUS.md
+RULES.md
+contracts/*/README.md
+web/README.md
+web/AGENTS.md
