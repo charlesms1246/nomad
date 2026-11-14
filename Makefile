@@ -22,7 +22,7 @@ SWEEP ?= 1
 PORT ?= 8787
 TSX := pnpm exec tsx
 
-.PHONY: help install build test test-ts test-rust test-sandbox sim sim-serve dry-run ui live race fixtures race3 relayer-key ui-check kill-tests accounts fund fixture-accounts colo-check clean
+.PHONY: help install build test test-ts test-rust test-sandbox sim sim-serve dry-run ui live race fixtures race3 relayer-key ui-check mainnet-proof kill-tests accounts fund fixture-accounts colo-check clean
 
 help:
 	@sed -n '1,14p' Makefile
@@ -93,6 +93,10 @@ fixtures: build
 
 kill-tests: build
 	for k in scripts/k*.ts; do echo "== $$k"; $(TSX) $$k || exit 1; done
+
+# Read-only mainnet proof: our signer's 3-agent ring against intents.near simulate_intents (no keys, no funds).
+mainnet-proof: build
+	cd apps/matcher && $(TSX) ../../scripts/mainnet-simulate.ts
 
 colo-check: build
 	node packages/colo/dist/cli.js check --account $${MATCHER_ID:-intents-matcher.nomadswarm.testnet} --target $${VERIFIER_ID:-intents.nomadswarm.testnet} --network testnet
