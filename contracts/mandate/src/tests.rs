@@ -232,11 +232,14 @@ fn tip_counts_toward_price_and_limits() {
     let mut l = leg(1_000_000, 999_000, 1);
     l.tip = Some(Tip { token: USDC.into(), amount: U128(1), receiver_id: acc("matcher.testnet") });
     assert!(m.check_leg(&l, NOW_MS).unwrap_err().contains("over per-leg max"));
-    let mut l = leg(100_000, 99_000, 1);
+    let mut l = leg(100_000, 99_500, 1);
+    l.tip = Some(Tip { token: USDC.into(), amount: U128(10), receiver_id: acc("matcher.testnet") });
+    assert_eq!(m.check_leg(&l, NOW_MS).unwrap(), vec![(USDC.to_string(), 100_010)]);
+    // a tip in the get token would dodge the price check: refused
     l.tip = Some(Tip { token: USDT.into(), amount: U128(10), receiver_id: acc("matcher.testnet") });
-    assert_eq!(m.check_leg(&l, NOW_MS).unwrap(), vec![(USDC.to_string(), 100_000), (USDT.to_string(), 10)]);
+    assert!(m.check_leg(&l, NOW_MS).unwrap_err().contains("tip must be in the give token"));
     l.tip = Some(Tip { token: BTC.into(), amount: U128(10), receiver_id: acc("matcher.testnet") });
-    assert!(m.check_leg(&l, NOW_MS).unwrap_err().contains("token not allowed"));
+    assert!(m.check_leg(&l, NOW_MS).unwrap_err().contains("tip must be in the give token"));
 }
 
 #[test]

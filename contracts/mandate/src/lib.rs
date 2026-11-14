@@ -365,6 +365,12 @@ impl Mandate {
         if self.rule(&leg.get).is_none() {
             return Err(format!("token not allowed: {}", leg.get));
         }
+        if let Some(t) = &leg.tip {
+            // The tip is paid in the give token so the price check below covers it.
+            if t.token != leg.give {
+                return Err("tip must be in the give token".into());
+            }
+        }
         let price = self
             .prices
             .iter()
