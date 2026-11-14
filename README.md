@@ -99,15 +99,15 @@ The on-chain check is [scripts/check-ring.ts](scripts/check-ring.ts). It reads t
 
 ### In the browser, in 5 minutes
 
-All you need is a browser. `/` and `/v2` read NEAR testnet live, `/dashboard` replays recorded testnet data, and no page can move funds.
+All you need is a browser. `/` and `/rings` read NEAR testnet live, `/dashboard` replays recorded testnet data, and no page can move funds.
 
 1. **Watch a ring settle.** Open https://nomad.charlesms.dev and scroll to **One ring, start to finish**. It replays a real three-wallet ring step by step, from proposal to tips, with links to the real transactions.
-2. **Verify every ring.** Open https://nomad.charlesms.dev/v2?verify=1. Each closed ring gets a green **Verified on chain** box once your browser has re-checked it against the Verifier.
+2. **Verify every ring.** Open https://nomad.charlesms.dev/rings?verify=1. Each closed ring gets a green **Verified on chain** box once your browser has re-checked it against the Verifier.
 3. **See the agents.** Open https://nomad.charlesms.dev/dashboard to watch the agents trade in rings, replayed from recorded testnet data.
 4. **Check one transaction.** Open [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR) on NearBlocks. `k4` calls `close_ring`, one `execute_intents` settles all three legs, and the tips go to `k4`.
 
 ![Landing page: the ring replay](media/landing.png)
-![/v2?verify=1: every close re-checked on chain](media/v2-verified.png)
+![/rings?verify=1: every close re-checked on chain](media/rings-verified.png)
 ![/dashboard: the agent swarm](media/dashboard.png)
 
 ## How it works
@@ -130,7 +130,7 @@ flowchart LR
   end
   subgraph OffChain["Off-chain"]
     MT["Matchers<br/>ring finder, auction"]
-    WEB["Web UI<br/>landing, v2, dashboard"]
+    WEB["Web UI<br/>landing, rings, dashboard"]
   end
   W -- "signed legs, EIP-712 orders" --> R
   A -- "signed legs" --> R
@@ -268,7 +268,7 @@ In this mode the matcher adds its own fee leg to the batch. Matchers compete on 
 | Offer board | [contracts/board/src/lib.rs](contracts/board/src/lib.rs) | 40 tests in [contracts/board/src/tests.rs](contracts/board/src/tests.rs) |
 | 1Click baseline, with the fallback refused on testnet | [packages/oneclick/src/fallback.ts](packages/oneclick/src/fallback.ts) | [fallback.test.ts](packages/oneclick/test/fallback.test.ts) |
 | Signatures accepted by mainnet `intents.near` | [scripts/mainnet-simulate.ts](scripts/mainnet-simulate.ts) | `make mainnet-proof` (read-only) |
-| `/v2?verify=1`: re-checks every close on chain in the browser | [web/components/V2Rings.tsx](web/components/V2Rings.tsx) | No unit test. [scripts/check-ring.ts](scripts/check-ring.ts) runs the same checks from the command line. `make ui-check` screenshots |
+| `/rings?verify=1`: re-checks every close on chain in the browser | [web/components/OnchainRings.tsx](web/components/OnchainRings.tsx) | No unit test. [scripts/check-ring.ts](scripts/check-ring.ts) runs the same checks from the command line. `make ui-check` screenshots |
 | Landing ring replay | [web/components/landing/RingReplay.tsx](web/components/landing/RingReplay.tsx) | `make ui-check` screenshots |
 
 ## Proof on testnet
@@ -403,10 +403,10 @@ cd web && npm install && npm run dev
 
 Then open:
 - http://localhost:3000 for the ring replay;
-- http://localhost:3000/v2?verify=1 for the on-chain rings, re-checked as the page loads;
+- http://localhost:3000/rings?verify=1 for the on-chain rings, re-checked as the page loads;
 - http://localhost:3000/dashboard for the swarm view, playing back recorded testnet data unless `MATCHER_URL` points to a running matcher. `make sim-serve` in another terminal serves a live simulation, which the page labels Simulation.
 
-`make ui-check` (stop any running `web/` dev server first) starts a sim matcher and the dev UI. It then saves headless screenshots to `out/ui-check/`: `/` and `/v2` at 1440 px and 390 px, and `/dashboard` at 1440 px.
+`make ui-check` (stop any running `web/` dev server first) starts a sim matcher and the dev UI. It then saves headless screenshots to `out/ui-check/`: `/` and `/rings` at 1440 px and 390 px, and `/dashboard` at 1440 px.
 
 **Read the contracts with no tools but `curl`**
 
@@ -434,7 +434,7 @@ Change `method_name` and `args_base64` (base64 of the JSON args) to call any vie
 Everything else runs without keys, and together it covers each claim:
 - **Signatures and settlement logic:** `make dry-run` (our testnet Verifier) and `make mainnet-proof` (mainnet `intents.near`), both read-only.
 - **Contract logic:** `make test`, which runs the rings, mandate and board contract tests in Rust.
-- **What happened on chain:** https://nomad.charlesms.dev/v2?verify=1 re-checks every close in your browser, and every row in [Proof on testnet](#proof-on-testnet) links its transaction.
+- **What happened on chain:** https://nomad.charlesms.dev/rings?verify=1 re-checks every close in your browser, and every row in [Proof on testnet](#proof-on-testnet) links its transaction.
 - **Ring validity against the live contract:** the `check_ring_view` view returns `null` for a valid ring, or the reason it would be refused. It needs no account.
 
 ## Contract API
@@ -494,7 +494,7 @@ You can confirm that the contracts have no keys with `view_access_key_list`, whi
 - **Real, on NEAR testnet:** every transaction linked in this README, including the ring settlements, stranger closes, ERC-7683 order checks, mandate signatures through the live MPC network, attacks and kill tests. The parties are our own agents and fresh test wallets, trading test tokens with no market value.
 - **Real, read-only on mainnet:** `make mainnet-proof` (`simulate_intents` on `intents.near`), the Verifier code-hash comparison and the 1Click quotes used as a baseline. No mainnet transaction is ever sent.
 - **Simulated, locally:** `make sim` and `make sim-serve`. Offers are random, and the agents and the ledger (or the Verifier model) run in one process.
-- **Recorded:** `/dashboard` plays back a testnet state that we recorded. It is labelled as recorded, and its transaction links are real. `/` and `/v2` read testnet live in the browser. `/` falls back to a saved copy of the same ring if RPC is unreachable.
+- **Recorded:** `/dashboard` plays back a testnet state that we recorded. It is labelled as recorded, and its transaction links are real. `/` and `/rings` read testnet live in the browser. `/` falls back to a saved copy of the same ring if RPC is unreachable.
 
 ## Limits
 

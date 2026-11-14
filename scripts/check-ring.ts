@@ -1,4 +1,4 @@
-// Read-only on-chain check of one settled v2 ring (no keys, no transactions).
+// Read-only on-chain check of one settled on-chain ring (no keys, no transactions).
 //   1. read the ring from rings.nomadswarm.testnet (status, closer, legs, wallet standards)
 //   2. fetch the close tx from an archival RPC and check it is close_ring(ring_id) from a non-party
 //   3. check the Verifier's execute_intents receipt succeeded with one token_diff per leg, each equal to

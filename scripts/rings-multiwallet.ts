@@ -1,4 +1,4 @@
-// Nomad v2 with mixed wallet standards: a NEAR agent (nep413), an Ethereum-style key (erc191) and a
+// Nomad on-chain rings with mixed wallet standards: a NEAR agent (nep413), an Ethereum-style key (erc191) and a
 // Solana-style key (raw_ed25519) trade in one ring through rings.nomadswarm.testnet, and a stranger
 // (k4.nomadswarm.testnet) closes it. One execute_intents (called by the contract) settles every leg;
 // the closer is paid the tips.

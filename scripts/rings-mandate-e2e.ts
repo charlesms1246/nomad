@@ -1,4 +1,4 @@
-// Nomad v2: a ring whose leg is signed by an on-chain MANDATE (Chain Signatures), closed by a stranger
+// Nomad on-chain rings: a ring whose leg is signed by an on-chain MANDATE (Chain Signatures), closed by a stranger
 // through rings.nomadswarm.testnet. No hot key signs the mandate's leg: mandate.nomadswarm.testnet checks
 // the leg against the owner's rules (tokens, per-leg max, daily budget, min price) and only then asks
 // the MPC network to sign it (erc191, for the MPC-derived 0x address).

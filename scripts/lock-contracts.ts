@@ -1,4 +1,4 @@
-// Feature freeze: delete the FullAccess keys of the v2 contract accounts so nobody (the team included)
+// Feature freeze: delete the FullAccess keys of the rings and mandate contract accounts so nobody (the team included)
 // can redeploy their code. What remains is listed per account. Irreversible.
 // Usage (from apps/matcher): npx tsx ../../scripts/lock-contracts.ts rings.nomadswarm.testnet mandate.nomadswarm.testnet
 import fs from "node:fs";

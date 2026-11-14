@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local UI check against a dev instance (never the deployed UI): starts the sim matcher on
 # $SIM_PORT, a web/ dev server on $UI_PORT pointed at it, checks /api/state through the UI's proxy,
-# and saves headless screenshots to out/ui-check/ (ui.png = /dashboard; landing-*.png = /; v2-*.png = /v2). Usage: make ui-check [MATCHER_URL=...]
+# and saves headless screenshots to out/ui-check/ (ui.png = /dashboard; landing-*.png = /; rings-*.png = /rings). Usage: make ui-check [MATCHER_URL=...]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Uncommon default ports (cleanup kills whatever listens on them); override with SIM_PORT / UI_PORT.
@@ -53,15 +53,15 @@ if [[ -n "$SHOT" ]]; then
     fi
   }
   # Compile each route before shooting it (a cold dev compile can outlast the screenshot).
-  for r in / /dashboard /v2; do curl -s -o /dev/null "http://localhost:$UI_PORT$r" || true; done
+  for r in / /dashboard /rings; do curl -s -o /dev/null "http://localhost:$UI_PORT$r" || true; done
   shot ui 1440 900 /dashboard 5000 0                  # the matcher dashboard (was at / before the landing page)
   shot landing-1440 1440 900 /
   shot landing-390 390 844 /
   shot landing-1440-replay 1440 900 / 8000 0 0 "#replay"
   shot landing-390-replay 390 844 / 8000 0 0 "#replay"
   shot landing-1440-reduced 1440 900 / 3000 0 1
-  shot v2-1440 1440 900 /v2 6000 0
-  shot v2-390 390 844 /v2 6000
+  shot rings-1440 1440 900 /rings 6000 0
+  shot rings-390 390 844 /rings 6000
 else
   echo "ui-check: no headless Chromium found (npx playwright install chromium-headless-shell); skipped screenshot"
 fi

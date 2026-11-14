@@ -2,7 +2,7 @@
 name = "nomad-rings"
 version = "0.1.0"
 edition = "2021"
-description = "Nomad v2: permissionless on-chain ring closing for NEAR Intents (any wallet standard), closer tips, ERC-8004-style reputation"
+description = "Nomad rings: permissionless on-chain ring closing for NEAR Intents (any wallet standard), closer tips, ERC-8004-style reputation"
 license = "MIT"
 
 [lib]

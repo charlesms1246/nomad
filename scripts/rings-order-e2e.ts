@@ -1,4 +1,4 @@
-// Nomad v2, ERC-7683 path end to end on testnet:
+// Nomad on-chain rings, ERC-7683 path end to end on testnet:
 //   an Ethereum wallet (fresh secp256k1 key) signs an ERC-7683 (earlier draft) GaslessCrossChainOrder
 //   (EIP-712): "give up to 1 USDC, want at least 0.285 wNEAR per USDC" -> anyone relays it to
 //   rings.nomadswarm.testnet `submit_order` (EIP-712 digest + ecrecover ON CHAIN) ->

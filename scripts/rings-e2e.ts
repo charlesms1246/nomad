@@ -1,4 +1,4 @@
-// Nomad v2 end to end on testnet (kill test K-b):
+// Nomad on-chain rings end to end on testnet (kill test K-b):
 //   deploy contracts/rings to rings.nomadswarm.testnet (once), then
 //   proposer posts a 3-agent ring (no matcher leg; all surplus to the agents) ->
 //   each agent signs its own leg (token_diff + a tip transfer to the rings contract) ->
@@ -56,7 +56,7 @@ const offers: Offer[] = T.map((t, i) => {
 });
 const sized = sizeRing(offers, { feePips: fee, phi: 0, minGiveUnits: 1n });
 if (!sized) throw new Error("ring does not clear");
-// no matcher leg on v2: the last agent absorbs the rounding dust (it only gets more)
+// no matcher leg in on-chain rings: the last agent absorbs the rounding dust (it only gets more)
 const legsRaw = sized.legs.map((l, i) => ({ ...l, getAmt: i === sized.legs.length - 1 ? l.getAmt + sized.matcherLeg.amt : l.getAmt }));
 const legs = legsRaw.map((l) => ({
   agent: l.agent,

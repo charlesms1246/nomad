@@ -1,4 +1,4 @@
-//! Nomad v2 — permissionless on-chain ring closing for NEAR Intents.
+//! Nomad rings — permissionless on-chain ring closing for NEAR Intents.
 //!
 //! A *ring* is a cycle of 2..=5 legs: leg i gives `give_amt` of `give` and receives `get_amt` of
 //! `get`, and `get` of leg i is `give` of leg i+1. It settles in ONE `execute_intents` call on the
