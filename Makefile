@@ -43,6 +43,8 @@ test-ts: build
 # Board unit tests (no wasm needed). The near-workspaces sandbox test needs the wasm and cargo-near: `make test-sandbox`.
 test-rust:
 	cd contracts/board && cargo test --quiet --lib
+	cd contracts/rings && cargo test --quiet
+	cd contracts/mandate && cargo test --quiet
 
 test-sandbox:
 	command -v cargo-near >/dev/null || cargo install cargo-near --version 0.23.0 --locked
