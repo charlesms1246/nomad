@@ -92,6 +92,7 @@ What we claim as different, and nothing more:
 - Node ≥ 20.
 - pnpm 9. The root `package.json` pins `pnpm@9.15.0` via `packageManager`, so `corepack enable` picks the right version.
 - Rust only for `make test-rust`, `make test-sandbox` and building the contracts. `make test` runs the board's Rust unit tests, so it needs `cargo`.
+- On a fresh clone, `pnpm install` prints harmless `Failed to create bin … dist/cli.js` warnings, because the packages aren't built yet. `make` builds them.
 - No NEAR keys or funds are needed for `make sim`, `make dry-run`, `make mainnet-proof` or `make test`.
 
 ## Try it (no keys, no funds)
@@ -363,7 +364,7 @@ Known limits:
 
   Useful settings: `SUBMIT_AS=verifier` (submit through the delegated `execute_intents` key), `ROUND_MS`, `MAX_ROUNDS=0`. Top agents up with `make fund`.
 - **UI data:** the UI reads `MATCHER_URL/api/state` server-side.
-  - With no reachable matcher, it shows a recorded real testnet state ([fixtures/ui/live-snapshot.json](fixtures/ui/live-snapshot.json)), labelled as recorded.
+  - With no reachable matcher, it shows a recorded real testnet state, [web/lib/live-snapshot.json](web/lib/live-snapshot.json) (`meta.source` "recorded"), labelled as such. That is the copy the UI serves.
   - `/v2` needs no server: it reads `rings.nomadswarm.testnet` from testnet RPC in the browser.
 
 ## Demo
