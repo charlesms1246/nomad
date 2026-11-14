@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="media/logo-dark.png">
-    <img src="media/logo-light.png" alt="Nomad" width="600">
-  </picture>
+  <img src="media/logo-dark.png" alt="Nomad" width="600">
 </p>
 
 # Nomad
