@@ -132,7 +132,8 @@ async function main() {
             const t = tokens.find((x) => x.id === l.get)!;
             return s + ((Number(BigInt(bs[i]!.ringAmountOut) - BigInt(bs[i]!.quoteAmountOut)) / 10 ** t.decimals) * t.priceUsd);
           }, 0);
-          return { savingsBps: Math.round(mean * 10) / 10, savingsUsd: Math.round(usd * 10_000) / 10_000, quotedAtMs: Date.parse(bs[0]!.timestamp) };
+          const meanNoFee = bs.reduce((s, b) => s + b.savingsBpsNoFee, 0) / bs.length;
+          return { savingsBps: Math.round(mean * 10) / 10, savingsBpsNoFee: Math.round(meanNoFee * 10) / 10, savingsUsd: Math.round(usd * 10_000) / 10_000, quotedAtMs: Date.parse(bs[0]!.timestamp) };
         },
       },
       chain,

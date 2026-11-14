@@ -66,6 +66,8 @@ export interface Ring {
   matcherShareBps: number; // matcher's cut of the surplus, in bps of the closing leg
   savingsBps: number | null; // mean over legs vs a same-time 1Click dry quote; null if no quote
   savingsUsd: number | null;
+  /** Savings vs the same quotes with the keyless 20 bps 1Click app fee added back (the stricter figure). */
+  savingsBpsNoFee?: number | null;
   baselineQuotedAtMs: number | null; // timestamp of the 1Click quotes used for savings
   deadline: string; // ISO
   proposedAtMs: number;

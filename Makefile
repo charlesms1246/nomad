@@ -96,7 +96,7 @@ fixtures: build
 	cd apps/matcher && AGENT_PREFIX=fx $(TSX) src/cli-fixtures.ts $(CURDIR)/fixtures/rings
 
 kill-tests: build
-	for k in scripts/k*.ts; do echo "== $$k"; $(TSX) $$k || exit 1; done
+	for k in scripts/k*.ts; do echo "== $$k"; (cd apps/matcher && $(TSX) ../../$$k) || exit 1; done
 
 # Read-only mainnet proof: our signer's 3-agent ring against intents.near simulate_intents (no keys, no funds).
 mainnet-proof: build

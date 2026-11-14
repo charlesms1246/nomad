@@ -27,7 +27,7 @@ export interface MatcherOpts {
   maxRingsPerRound?: number;
   now?: () => number;
   /** Optional per-ring baseline (1Click dry quotes), filled in after settlement. */
-  baseline?: (ring: FoundRing) => Promise<{ savingsBps: number; savingsUsd: number; quotedAtMs: number } | null>;
+  baseline?: (ring: FoundRing) => Promise<{ savingsBps: number; savingsBpsNoFee?: number; savingsUsd: number; quotedAtMs: number } | null>;
   onRing?: (r: UiRing) => void;
   log?: (msg: string, extra?: object) => void;
 }
@@ -168,6 +168,7 @@ export class Matcher {
       const b = await this.opts.baseline(r).catch(() => null);
       if (b) {
         ui.savingsBps = b.savingsBps;
+        ui.savingsBpsNoFee = b.savingsBpsNoFee ?? null;
         ui.savingsUsd = b.savingsUsd;
         ui.baselineQuotedAtMs = b.quotedAtMs;
         this.emit(ui);
