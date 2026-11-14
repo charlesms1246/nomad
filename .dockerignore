@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/target
+**/.next
+web
+keys
+out
+.env
+.env.*
+.git

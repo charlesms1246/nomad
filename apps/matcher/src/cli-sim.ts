@@ -93,6 +93,7 @@ async function serve(swarm: SwarmStats) {
   const tokens = SIM_TOKENS.slice(0, TOKENS);
   startServer({
     port: +env("PORT", "8787"),
+    host: process.env.HOST,
     log: console.log,
     state: () =>
       buildState({
