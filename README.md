@@ -39,7 +39,7 @@ Output below was captured from this repo on 2026-11-14.
 | Ring search, fee-correct sizing, surplus split | [packages/ringfinder/src/index.ts](packages/ringfinder/src/index.ts) | [ringfinder.test.ts](packages/ringfinder/test/ringfinder.test.ts) (property tests) |
 | An agent never signs outside its offer | [apps/agent/src/legCheck.ts](apps/agent/src/legCheck.ts) | [legCheck.test.ts](apps/agent/test/legCheck.test.ts); [legCheck.prop.test.ts](apps/agent/test/legCheck.prop.test.ts) (fast-check, through the real signing path; each of the 5 guards was removed in turn and the tests caught it) |
 | Agent strategies | [apps/agent/src/strategies.ts](apps/agent/src/strategies.ts) | [strategies.test.ts](apps/agent/test/strategies.test.ts) |
-| Matcher loop: propose → collect → simulate → execute | [apps/matcher/src/matcher.ts](apps/matcher/src/matcher.ts) | [matcher.test.ts](apps/matcher/test/matcher.test.ts) (end to end); live rings in [MEASUREMENTS](docs/MEASUREMENTS.md#live-rings-make-live) |
+| Matcher loop: propose → collect → simulate → execute | [apps/matcher/src/matcher.ts](apps/matcher/src/matcher.ts) | [matcher.test.ts](apps/matcher/test/matcher.test.ts) (end to end); live rings in [MEASUREMENTS](docs/MEASUREMENTS.md#36-minute-live-run-submit_asverifier-auto_fund10-make-live) |
 | NEP-413 signing, versioned nonce, Verifier client | [packages/intents/src](packages/intents/src) | [intents.test.ts](packages/intents/test/intents.test.ts) (golden vector, cross-checked against `node:crypto`); K1–K8 on testnet |
 | Our Verifier deployment | [contracts/verifier/build.sh](contracts/verifier/build.sh), [deploy.ts](contracts/verifier/deploy.ts) | wasm sha256 `cb632a69…daedf`; [MEASUREMENTS § Deployment](docs/MEASUREMENTS.md#deployment) |
 | Kill tests K1–K8 | [scripts/k1-ring3.ts](scripts/k1-ring3.ts) … [k8-deadline.ts](scripts/k8-deadline.ts) | [MEASUREMENTS § Kill tests](docs/MEASUREMENTS.md#kill-tests): 7 pass; K7 fails as specified (see [Shard placement](#shard-placement-a-measured-negative-result)) |
@@ -103,7 +103,14 @@ All of these are in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md), with tx hashes
 - **Kill tests K1–K8:** 7 pass. K7 fails as specified; it is the finding above.
 - **Differential test:** 500/500 random batches agree between `packages/verifier-model` and testnet `simulate_intents` (seed 1 with N = 200, seed 7 with N = 300).
 - **Attacks on chain:** all 10 rows pass. Each attack fails with the expected Verifier error and moves no balance.
-- **Live rings:** k = 3, 4 and 5 settled in one `execute_intents` each, for example [`3BJdW7Vr…`](https://testnet.nearblocks.io/txns/3BJdW7Vrn45r1T1tZY26hFSAUKSTPMxammsXDMaTib6J) (k = 4).
+- **36-minute live run** (2026-11-14, 00:35–01:11 UTC, 12 agents, `SUBMIT_AS=verifier AUTO_FUND=10 make live`; [live-30min.json](docs/measurements/live-30min.json)):
+  - **27 rings settled, 0 failed** (k = 3: 4, k = 4: 17, k = 5: 6), each in one `execute_intents` call;
+  - **0 blocks to execute in 27/27** (signed as the Verifier through the delegated key);
+  - against a same-time 1Click mainnet dry quote for each leg (21 rings had quotes), a mean saving of **+20.5 bps** (range +14.6 to +33.0);
+  - about 15.1 Tgas per ring;
+  - examples: [`Fd5Q86nQ…`](https://testnet.nearblocks.io/txns/Fd5Q86nQS8qmn4aQz7of5vXXUx86sscwNpFa5J1sPoCw) (k = 4), [`EqLHddfT…`](https://testnet.nearblocks.io/txns/EqLHddfTmLVHUVgE5MUZcfgT56SfLCWSr4nBFdWSPso3) (k = 5).
+
+  These are tiny test-sized rings between our own 12 agents with no market value: the savings total $0.087. They show the mechanism works end to end, not demand or liquidity.
 - **Sim sweep** (5 tokens, 3 seeds): the share of offers cleared by rings was 49.7% at 10 agents, 48.1% at 20, 49.6% at 50, 48.4% at 100 and 43.9% at 200. **It stays flat at about 44–50% and does not rise with more agents.** The number of rings grows with the number of offers (6 → 154). The sim's offers are random, so this says nothing about how often rings occur in a real agent economy.
 
 ## House of Stake spend budgets (stretch)
@@ -136,7 +143,8 @@ All on NEAR testnet. Explorer: `https://testnet.nearblocks.io/txns/<hash>`.
 
 Ring settlements:
 - K1 3-agent ring: [`BgjzT1Va…`](https://testnet.nearblocks.io/txns/BgjzT1VayBzmvfuqx29pmBnj1tzS1M7hxkXJ3sigVRKE).
-- Live rings: [`EUKjsAMQ…`](https://testnet.nearblocks.io/txns/EUKjsAMQzasdX6xXLpc8huZtvz3hhVhJPNxf5pxRDYf2), [`tb8LgK1e…`](https://testnet.nearblocks.io/txns/tb8LgK1evng8wzYB8FT2T1n2g8LL3FCfU37u5dWRxfz) (k = 5) and [`3BJdW7Vr…`](https://testnet.nearblocks.io/txns/3BJdW7Vrn45r1T1tZY26hFSAUKSTPMxammsXDMaTib6J) (k = 4).
+- 36-minute live run: [`Fd5Q86nQ…`](https://testnet.nearblocks.io/txns/Fd5Q86nQS8qmn4aQz7of5vXXUx86sscwNpFa5J1sPoCw) (k = 4), [`EqLHddfT…`](https://testnet.nearblocks.io/txns/EqLHddfTmLVHUVgE5MUZcfgT56SfLCWSr4nBFdWSPso3) (k = 5); all 27 in [live-30min.json](docs/measurements/live-30min.json).
+- First live rings: [`EUKjsAMQ…`](https://testnet.nearblocks.io/txns/EUKjsAMQzasdX6xXLpc8huZtvz3hhVhJPNxf5pxRDYf2), [`tb8LgK1e…`](https://testnet.nearblocks.io/txns/tb8LgK1evng8wzYB8FT2T1n2g8LL3FCfU37u5dWRxfz) (k = 5) and [`3BJdW7Vr…`](https://testnet.nearblocks.io/txns/3BJdW7Vrn45r1T1tZY26hFSAUKSTPMxammsXDMaTib6J) (k = 4).
 
 Our parent account `nomadswarm.testnet` is super-admin of this Verifier deployment, a centralisation point that only exists in our testnet setup.
 
