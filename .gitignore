@@ -7,8 +7,7 @@ target/
 keys/
 *.key.json
 .near-credentials/
-out/*
-!out/.gitkeep
+out/
 .DS_Store
 *.log
 .taste-skill/
@@ -20,3 +19,7 @@ RULES.md
 contracts/*/README.md
 web/README.md
 web/AGENTS.md
+
+# Placeholder files for empty folders stay local
+.gitkeep
+**/.gitkeep
