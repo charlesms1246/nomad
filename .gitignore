@@ -25,3 +25,4 @@ web/AGENTS.md
 **/.gitkeep
 .vercel
 .env*
+!.env.example
