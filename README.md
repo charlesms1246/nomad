@@ -25,7 +25,7 @@ Agents that hold different tokens trade in **rings** (A wants B's token, B wants
 - **Any account can call `close_ring`.** The contract makes one cross-contract `execute_intents` call and pays the agents' tips to whoever closed the ring.
 - There is no matcher leg, and no allowlist for proposing or closing.
 - The contract keeps reputation counters (ERC-8004-style: rings settled, rings closed, legs in failed closes).
-- EVM users can also submit an EIP-712 order (ERC-7683 earlier-draft `GaslessCrossChainOrder`). The contract checks it with `ecrecover`.
+- EVM users can also submit an EIP-712 order (the ERC-7683 earlier-draft `GaslessCrossChainOrder`) with `submit_order`. The contract checks it with `ecrecover` and enforces its minimum price on every ring that includes that wallet.
 - **Measured:** a stranger account (`k4`) closed a ring whose three legs were signed in **three different standards**: [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR). Details are in [Measurements](#measurements).
 
 **Mandates (v2, `contracts/mandate`, in progress).** An owner sets limits on chain. The contract then requests a leg signature from NEAR's MPC signer (Chain Signatures, `v1.signer-prod.testnet`) for an `erc191` leg.
@@ -55,7 +55,7 @@ Everything in that list, Nomad also does or now does. Fee competition between ma
 | Who finds rings | Off-chain scouts | v1: off-chain matchers. v2: anyone calls `propose_ring` on the contract |
 | Who submits the settlement | The scout that won, from its own account | v1: the matcher. v2: **any account** calls `close_ring`; the contract makes the `execute_intents` call and pays the closer the agents' tips |
 | Fee competition | Yes: scouts compete on tip | v1: yes (`make fee-race`, 3 matchers we run). v2: tips are set by the agents; there's no matcher cut |
-| Wallet standards in a ring | NEP-413 | `nep413`, `erc191` and `raw_ed25519` in **one** settled ring; EIP-712 orders via `ecrecover` (unit-tested) |
+| Wallet standards in a ring | NEP-413 | `nep413`, `erc191` and `raw_ed25519` in **one** settled ring; EIP-712 orders (ERC-7683 earlier draft) verified on chain with `ecrecover` |
 | Mandates | Off chain: NEAR AI reads plain-English orders | Off chain: `legCheck`, optional LLM margin. On chain (in progress): `contracts/mandate` gets MPC signatures for legs; one leg passed `simulate_intents` |
 | Reputation | Not mentioned in its README | On-chain counters in `contracts/rings` (rings settled, rings closed, failed closes) |
 | 1Click floor / fallback | Real quote floors, and the fallback is taken | Quotes as the baseline; the fallback is refused on testnet by design |
@@ -131,7 +131,7 @@ What `make mainnet-proof` shows, and no more:
 | (Research appendix) Delegated relayer key and 3-way race | [apps/matcher/src/cli-relayer-key.ts](apps/matcher/src/cli-relayer-key.ts), `SUBMIT_AS=verifier` in [cli-live.ts](apps/matcher/src/cli-live.ts) | `make relayer-key && make race3`; [race3.json](docs/measurements/race3.json) |
 | (Research appendix) Shard tool `colo` (CLI, library, MCP server) | [packages/colo/src](packages/colo/src) | [packages/colo/test](packages/colo/test) |
 | Agent MCP server `nomad-mcp`: 6 tools (`nomad_tokens`, `nomad_balance`, `nomad_offer`, `nomad_cancel`, `nomad_status`, `nomad_leaderboard`) | [apps/agent/src/mcp.ts](apps/agent/src/mcp.ts) | No automated test |
-| v2 on-chain closer: `propose_ring`, `attach_leg`, permissionless `close_ring` (cross-contract `execute_intents`, tips paid to the closer with `mt_transfer`), reputation counters, ERC-7683 order ingress | [contracts/rings/src](contracts/rings/src) | `cd contracts/rings && cargo test` (16 tests, including the ERC-7683 golden vector and `ecrecover`); on chain: [scripts/rings-e2e.ts](scripts/rings-e2e.ts), [scripts/rings-multiwallet.ts](scripts/rings-multiwallet.ts) |
+| v2 on-chain closer: `propose_ring`, `attach_leg`, permissionless `close_ring` (cross-contract `execute_intents`, tips paid to the closer with `mt_transfer`), reputation counters, ERC-7683 order ingress | [contracts/rings/src](contracts/rings/src) | `cd contracts/rings && cargo test` (16 tests, including the ERC-7683 golden vector and `ecrecover`); ERC-7683 on chain: [rings-order-e2e.json](docs/measurements/rings-order-e2e.json); on chain: [scripts/rings-e2e.ts](scripts/rings-e2e.ts), [scripts/rings-multiwallet.ts](scripts/rings-multiwallet.ts) |
 | Wallet standards: `erc191` and `raw_ed25519` signers | [packages/intents/src/standards.ts](packages/intents/src/standards.ts) | [standards.test.ts](packages/intents/test/standards.test.ts) (vectors from near/intents and web3.js); K-a on chain ([scripts/k-a-multiwallet.ts](scripts/k-a-multiwallet.ts)) |
 | ERC-7683 (earlier draft) `GaslessCrossChainOrder`, EIP-712 digest and signature | [packages/intents/src/erc7683.ts](packages/intents/src/erc7683.ts) | [erc7683.test.ts](packages/intents/test/erc7683.test.ts); golden vector [erc7683-vector.json](packages/intents/test/fixtures/erc7683-vector.json), checked against viem 2.57.19 and loaded by the Rust tests |
 | On-chain mandates with MPC signatures (in progress) | [contracts/mandate/src](contracts/mandate/src) | `cd contracts/mandate && cargo test` (14 tests); K-c ([scripts/k-c-mandate.ts](scripts/k-c-mandate.ts)) |
@@ -153,7 +153,7 @@ What `make mainnet-proof` shows, and no more:
 | Agents | `a01`–`a12.nomadswarm.testnet`, each with its own Verifier key | Sim agents are in-process |
 | Fallback execution through 1Click | Refused on testnet by design (1Click is mainnet-only) | Quotes only |
 | On-chain mandates | The MPC signer (`v1.signer-prod.testnet`) signed a leg requested by `contracts/mandate`, and `simulate_intents` accepted it | That leg has not settled in a ring |
-| ERC-7683 orders | `ecrecover` in the contract matches our golden vector (unit tests) | Not yet exercised by an EVM wallet on chain |
+| ERC-7683 orders | A fresh Ethereum wallet's EIP-712 order was verified on chain, enforced and partly filled ([rings-order-e2e.json](docs/measurements/rings-order-e2e.json)) | One test wallet, scripted |
 | LLM mode | Coded and unit-tested against a mocked API | Not run against the live NEAR AI Cloud API |
 | UI | Reads the matcher's `/api/state` (badge LIVE). With no reachable matcher, a recorded real testnet state from 2026-11-13 23:53 UTC ([web/lib/live-snapshot.json](web/lib/live-snapshot.json)), labelled as recorded | With `make sim-serve`, simulated state labelled Simulation. `?mock=1` serves an invented layout fixture for UI development only |
 
@@ -201,6 +201,11 @@ All of these are in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md), with tx hashes
   - `k4` closed it [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR).
   - Each wallet gave 1,000,000 + a 1,000 tip and received 999,999. The closer received the three tips.
   - The same three standards also settled directly through `execute_intents` in K-a ([`EpaBq8dN…`](https://testnet.nearblocks.io/txns/EpaBq8dN8WhojK4eo1fqZ7XRBMXuGBdjv4G8bu5r379x)).
+- **v2, an ERC-7683 order from an Ethereum wallet** ([rings-order-e2e.json](docs/measurements/rings-order-e2e.json)):
+  - A fresh secp256k1 wallet (`0xecb3…0452`) signed an EIP-712 `GaslessCrossChainOrder` (ERC-7683 earlier draft, chain id 398) to give up to 1,000,000 USDC for wNEAR at a minimum price. `submit_order` checked it with `ecrecover` on chain [`DGMvefCs…`](https://testnet.nearblocks.io/txns/DGMvefCsuZuuzoSs6iqqkkMFjpGYhPPnAjAab1VzgkhV).
+  - A ring that paid the wallet less than its minimum price was **rejected** by `propose_ring`: `leg 0 pays less than order …'s minimum price` [`GvZcdEY5…`](https://testnet.nearblocks.io/txns/GvZcdEY5LPHfxxJ6M67ijEyVPhAbwE9ZrFdAZaLHXzFF).
+  - A ring at its price, with the wallet's `erc191` leg and two `nep413` agents (a03, a01), was closed by the stranger `k4` and settled [`D6YZJqgr…`](https://testnet.nearblocks.io/txns/D6YZJqgrEVXXNVLahodBycyBBqNV1RnwnY6ptAyCRhCK).
+  - The order now shows 399,495 of 1,000,000 filled.
 - **v2, MPC mandate** (K-c, [mandate.json](docs/measurements/mandate.json)):
   - `mandate.nomadswarm.testnet` requested an `erc191` leg signature from `v1.signer-prod.testnet` for its derived address `0x9915…bf9b` [`FnMcqifQ…`](https://testnet.nearblocks.io/txns/FnMcqifQZEMRrSjnK5xY7j5nrNzuwvx2MxfBQt3FPtCY), which took 8.8 s.
   - `simulate_intents` accepted the signed leg against a counter-leg.
@@ -246,7 +251,7 @@ Ring settlements:
 - The contract's own access control still names `nomadswarm.testnet` as super-admin, with the roles `Upgrader`, `RelayerKeysManager` and `SaltManager`. So the team can still upgrade the code, manage relayer keys and rotate salts through the contract.
 - This is the same model as mainnet, where the `intents.near` DAO holds those roles; here the holder is our team.
 
-**Who controls the v2 contracts.** `rings.nomadswarm.testnet` and `mandate.nomadswarm.testnet` still have FullAccess keys held by the team, so we can redeploy them. The rings contract's owner can change its fee setting and EIP-712 chain id (`set_fee_pips`, `set_chain_id`). Proposing, attaching and closing need no permission. Tips pass through the contract's own Verifier balance on their way to the closer.
+**Who controls the v2 contracts.** `rings.nomadswarm.testnet` and `mandate.nomadswarm.testnet` still have FullAccess keys held by the team, so we can redeploy them. The team plans to delete these keys at the feature freeze. Even after that, the rings contract's owner (`nomadswarm.testnet`) can still change its fee setting and EIP-712 chain id (`set_fee_pips`, `set_chain_id`; currently 1 pip and 398). Proposing, attaching and closing need no permission. Tips pass through the contract's own Verifier balance on their way to the closer.
 
 ## Threat model and known limits
 
