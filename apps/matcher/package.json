@@ -1,5 +1,6 @@
 {
   "name": "@nomad/matcher",
+  "description": "Nomad matcher: reads board offers, finds rings, collects signed legs, simulates and settles each ring in one execute_intents call, and serves GET /api/state for the web UI.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -1,11 +1,17 @@
 {
   "name": "@nomad/ringfinder",
+  "description": "Ring finding for Nomad: cycles over board offers, leg sizing at or above every limit with the Verifier fee, and the surplus split between agents and the matcher.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run"

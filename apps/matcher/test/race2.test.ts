@@ -58,8 +58,8 @@ describe("a settlement the matcher could not confirm", () => {
     // the chain executes, but the matcher sees a transport error (as with an RPC HANDLER_ERROR)
     const flaky = Object.create(chain) as LedgerChain;
     let first = true;
-    flaky.execute = async (s, sub) => {
-      const r = await chain.execute(s, sub);
+    flaky.execute = async (s) => {
+      const r = await chain.execute(s);
       if (first) { first = false; return { ...r, ok: false, txHash: null, error: "rpc HANDLER_ERROR" }; }
       return r;
     };

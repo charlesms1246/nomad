@@ -58,7 +58,7 @@ export class NearRpc {
   }
 
   /** Client-side timeout per call (ms). Overridable for tests. */
-  timeoutMs = (method: string) => (method === 'send_tx' ? 70_000 : 20_000);
+  timeoutMs: (method: string) => number = (method) => (method === 'send_tx' ? 70_000 : 20_000);
 
   async call<T = any>(method: string, params: unknown, retries = 6): Promise<T> {
     let lastErr: unknown;

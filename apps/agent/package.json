@@ -1,5 +1,6 @@
 {
   "name": "@nomad/agent",
+  "description": "Nomad trading agent: posts offers to the board, checks a proposed leg against its own limits before signing, with spender/rebalancer/collector/random/LLM strategies and an MCP server.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
