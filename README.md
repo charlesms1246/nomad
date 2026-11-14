@@ -33,37 +33,14 @@ Around this, Nomad adds:
 - **One-of-N commitments.** A party may sign legs for several competing rings that all fill the same offer. All of them share one Verifier nonce, so at most one can ever execute.
 - **An agent swarm.** Twelve agents post offers. Matchers find rings, and the agents auction their legs between the matchers on price.
 
-## Concepts
-
-| Term | Meaning |
-|---|---|
-| **Verifier** | The NEAR Intents contract (`intents.near` on mainnet) that holds users' token balances. It executes signed intents. Its `execute_intents` method takes many signed messages and commits all of them or none. Nomad's testnet Verifier is `intents.nomadswarm.testnet`, which runs mainnet's exact code |
-| **Leg** | One party's part of a ring: a signed `token_diff` intent saying "−X of token A, +Y of token B", plus an optional tip. Its signature covers the exact amounts, so nobody can change a leg after it is signed |
-| **Ring** | A cycle of 2 to 5 legs. Each leg's received token is the next leg's given token. A ring is valid only if every token nets to zero after the Verifier fee |
-| **Proposer** | Whoever calls `propose_ring` with the legs' terms. Anyone can propose |
-| **Closer** | Whoever calls `close_ring` once every leg is attached. Anyone can close. The closer pays the gas and receives the tips |
-| **Tip** | A small `transfer` intent that a party signs inside its own leg. It goes to the rings contract, which pays it to the closer. Our runs used 0.1% of the amount given |
-| **Nonce** | A 32-byte single-use value in every signed intent. The Verifier rejects a second use with `nonce was already used`. Nomad reuses one nonce on purpose across all the legs that a party signs for one offer |
-| **Salt** | A 4-byte value set by the Verifier that every nonce must embed. Rotating the salt invalidates every outstanding signature at once |
-| **Pip** | One millionth. The Verifier fee is set in pips: on each amount given, it charges `ceil(amount × fee / 1,000,000)`. Our Verifier charges 1 pip |
-| **Wallet standard** | How a leg is signed. `nep413` is a NEAR key. `erc191` is Ethereum `personal_sign`. `raw_ed25519` is a bare ed25519 key, as in Solana wallets. The Verifier accepts all three |
-| **Mandate** | An owner's limits for an agent: which tokens it may give, the most per leg, a daily budget and a minimum price. They are enforced by `mandate.nomadswarm.testnet` before it asks the MPC network to sign |
-| **Chain Signatures** | NEAR's MPC signing service (`v1.signer-prod.testnet`). A contract can ask it to sign under a key derived from the contract's account, so no single party holds the private key |
-| **1Click** | NEAR Intents' quote and swap API. Nomad uses its mainnet dry quotes only as a price baseline |
-
 ## Try it in 5 minutes, no install
 
-You only need a browser. Every page reads NEAR testnet directly, and nothing on it can move funds.
+All you need is a browser. Every page reads NEAR testnet live, and nothing on them can move funds.
 
-1. **Watch one ring settle.** Open https://nomad.charlesms.dev and scroll to **One ring, start to finish**, or press the button in the hero. The replay walks through ring `f5d3e16f…` stage by stage: proposed, a leg attached by each wallet, closed by the stranger `k4`, settled, tips paid and reputation updated. You can step through the stages with prev, next and pause, and the proposal and close transactions link to NearBlocks. **On testnet now** shows figures read live from the rings contract.
-2. **Check every ring on chain.** Press **Open live rings**, or open https://nomad.charlesms.dev/v2?verify=1. **Rings, newest first** lists every ring on `rings.nomadswarm.testnet`, with each leg's wallet standard (**Signed as**) and the tip it signed. Because of `?verify=1`, the page re-checks every closed ring as it loads, following `close_ring` to the `execute_intents` it caused. It compares each signed leg with the `token_diff` that executed and with the tips paid. A checked ring shows a line like: `Verified on chain: k4 (not one of the agents) called close_ring in block 277,670,820. The contract's execute_intents ran in block 277,670,822 (2 blocks later, one cross-contract hop), status SuccessValue, settling 3 legs in 3 wallet standards.` The **Reputation** table below it shows rings settled, rings closed and legs in failed closes for each account.
-3. **See the swarm.** Open https://nomad.charlesms.dev/dashboard. It shows the off-chain matcher swarm: agents, ring events, settled rings with NearBlocks links, and agent balances and reputation. With no live matcher behind it, the page plays back a real testnet state that we recorded, and labels it as recorded.
-4. **Cross-check one transaction yourself.** Open [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR) on NearBlocks.
-   - The signer is `k4.nomadswarm.testnet`, the receiver is `rings.nomadswarm.testnet`, and the method is `close_ring`.
-   - Under receipts, `rings.nomadswarm.testnet` calls `execute_intents` on `intents.nomadswarm.testnet`.
-   - That receipt's logs hold three `token_diff` events: −1,000,000/+999,999 for each of the three signers.
-   - Then `on_close` runs, and `mt_transfer` sends the three tips to `k4`.
-5. **Check that the Verifier is mainnet's code.** Run the two `curl` calls under [Proof on testnet](#proof-on-testnet). Both print the same code hash.
+1. **Watch a ring settle.** Open https://nomad.charlesms.dev and scroll to **One ring, start to finish**. It replays a real three-wallet ring step by step, from proposal to tips, with a link to every transaction.
+2. **Verify every ring.** Open https://nomad.charlesms.dev/v2?verify=1. Each closed ring gets a green **Verified on chain** box once your browser has re-checked it against the Verifier.
+3. **See the agents.** Open https://nomad.charlesms.dev/dashboard to watch the agents trade in rings, replayed from recorded testnet data.
+4. **Check one transaction.** Open [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR) on NearBlocks. `k4` calls `close_ring`, one `execute_intents` settles all three legs, and the tips go to `k4`.
 
 ## How it works
 
@@ -403,29 +380,6 @@ Events use the standard `nomad-rings`: `ring_proposed`, `leg_attached`, `ring_se
 | `preview_payload` | view | `leg` | The exact message and prehash that would be signed |
 | `mandate`, `spent_today` | view | `owner` / `owner`, `token` | The mandate, and today's spending for a token |
 | `config` | view | none | The Verifier and MPC accounts, the next leg id and the required deposits |
-
-## Repository layout
-
-```
-contracts/
-  rings/          on-chain ring closing, ERC-7683 orders, reputation (Rust, 16 tests)
-  mandate/        mandates signed through Chain Signatures (Rust, 14 tests)
-  board/          offer board for the off-chain swarm (Rust, 40 tests)
-  verifier/       how our testnet Verifier was first built and deployed
-packages/
-  intents/        NEP-413, erc191, raw_ed25519 and ERC-7683 signing; Verifier and RPC clients (28 tests)
-  ringfinder/     cycle search and fee-correct sizing (13 property tests)
-  verifier-model/ local model of the Verifier, 500/500 agreement with testnet simulate_intents (7 tests)
-  oneclick/       1Click quotes and the mainnet-only fallback guard (21 tests)
-  colo/           shard lookup tool, CLI and MCP server (17 tests)
-apps/
-  agent/          legCheck, strategies, fee auction, nomad-mcp server, optional LLM margin (29 tests)
-  matcher/        propose, collect, simulate, execute; the simulator; the /api/state container (10 tests)
-web/              Next.js UI: landing replay, /v2, /dashboard
-scripts/          kill tests K1–K8, attacks, the end-to-end ring, mandate and order runs, mainnet proof
-fixtures/rings/   signed rings for make dry-run
-config/           testnet accounts and token ids
-```
 
 ## Deployments
 
