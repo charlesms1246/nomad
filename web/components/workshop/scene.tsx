@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { Group, Vector3 } from "three"
+import { Group, Mesh, Vector3 } from "three"
 import type { NomadState } from "@/lib/types"
 import fallbackState from "@/lib/live-snapshot.json"
 import { Bot, specFor } from "./bot"
 import { StationBlock } from "./station"
-import { Director, STATIONS, buildBots, extraPlays, settledPlays, shortName, type BotDef, type DirectorNow } from "./director"
+import { Director, STATIONS, buildBots, extraPlays, settledPlays, shortName, stationXZ, type BotDef, type DirectorNow } from "./director"
 import { LabelContext, LabelProjector, labelEl, newLabelStore, type LabelStore } from "./labels"
 
 export interface RingWorkshopProps {
@@ -28,6 +28,35 @@ const FOLLOW_OFFSET = new Vector3(7, 11.5, 11.5)
 // POS_RATE < LOOK_RATE: the camera glides into place slightly slower than it turns to track.
 const POS_RATE = 2.2
 const LOOK_RATE = 3.5
+
+/** v2 rings: the execute_intents call leaves the rings contract and travels to the Verifier (a bright cube with a short trail). */
+function ExecutePulse({ director }: { director: Director }) {
+  const refs = useRef<(Mesh | null)[]>([])
+  const [rx, rz] = stationXZ("rings")
+  const [vx, vz] = stationXZ("verifier")
+  useFrame(() => {
+    const p = director.now.pulse
+    refs.current.forEach((m, i) => {
+      if (!m) return
+      const q = p == null ? -1 : p * 1.15 - i * 0.05
+      m.visible = q >= 0 && q <= 1
+      if (!m.visible) return
+      const e = q < 0.5 ? 2 * q * q : 1 - Math.pow(-2 * q + 2, 2) / 2
+      m.position.set(rx + (vx - rx) * e, 1.7 + Math.sin(Math.PI * e) * 2.2 - e * 0.4, rz + (vz - rz) * e)
+      m.rotation.set(q * 6, q * 8, 0)
+    })
+  })
+  return (
+    <group>
+      {[0.42, 0.3, 0.22, 0.15].map((size, i) => (
+        <mesh key={i} ref={(m) => { refs.current[i] = m }} visible={false}>
+          <boxGeometry args={[size, size, size]} />
+          <meshBasicMaterial color={i === 0 ? "#cfe3ff" : "#3987e5"} transparent opacity={1 - i * 0.2} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
 
 function CameraRig({
   mode,
@@ -149,6 +178,7 @@ export function RingWorkshopScene({ state, height = 520 }: RingWorkshopProps) {
             {STATIONS.map((s) => (
               <StationBlock key={s.id} station={s} />
             ))}
+            <ExecutePulse director={director} />
 
             {bots.map((b) => (
               <Bot

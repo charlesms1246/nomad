@@ -113,7 +113,7 @@ const SEGMENTS = {
   },
   /* /dashboard: the ring workshop plays the recorded three-wallet ring (f5d3e16f, closed by k4) from its first step.
      Overview while the offers are posted and the legs attached, then Follow (the camera picks up the closer, k4)
-     through close and execute_intents, then back to Overview for the settle hop. The workshop's clock is r3f's,
+     through close_ring and the contract's execute_intents call, then back to Overview for the settle hop. The workshop's clock is r3f's,
      which runs on virtual time, so the ring's start is found by stepping the paused clock until its first caption shows. */
   async dashboard() {
     await send("Page.navigate", { url: "about:blank" }); await sleep(300);

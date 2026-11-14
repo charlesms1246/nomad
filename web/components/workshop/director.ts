@@ -18,6 +18,8 @@ export interface Station {
   position: [number, number] // [x, z]
 }
 
+export const stationXZ = (id: StationId) => STATIONS.find((s) => s.id === id)!.position
+
 export const STATIONS: Station[] = [
   { id: "board", meshId: "dispatch", label: "Offer board", subLabel: "board.nomadswarm.testnet", position: [-7, -5] },
   { id: "rings", meshId: "compute", label: "Rings contract", subLabel: "propose and attach", position: [7, -5] },
@@ -162,6 +164,7 @@ export interface Phase {
 }
 
 const RING_SECONDS = 12
+const PULSE_AT = 6.9
 
 function script(p: Play): { steps: Step[]; phases: Phase[]; settleAt: number } {
   const steps: Step[] = []
@@ -178,7 +181,9 @@ function script(p: Play): { steps: Step[]; phases: Phase[]; settleAt: number } {
     }
   })
   steps.push({ at: 5.4, bot: p.closer, to: dock("rings", n, n + 1), task: "closes the ring" })
-  steps.push({ at: 6.9, bot: p.closer, to: dock("verifier", 0, 1), task: "execute_intents" })
+  // v1: the matcher submits execute_intents itself, so it walks to the Verifier. v2: the closer only calls
+  // close_ring; the rings contract makes the execute_intents call (drawn as a pulse from the contract to the Verifier).
+  if (p.version === "v1") steps.push({ at: 6.9, bot: p.closer, to: dock("verifier", 0, 1), task: "execute_intents" })
   const settleAt = 8.4
   for (const a of p.legs) steps.push({ at: settleAt, bot: a, to: dock("rings", p.legs.indexOf(a), n + 1), task: "settled" })
   if (p.version === "v2") steps.push({ at: 9.4, bot: p.closer, to: dock("reputation", 0, 1), task: "reputation updated" })
@@ -188,8 +193,11 @@ function script(p: Play): { steps: Step[]; phases: Phase[]; settleAt: number } {
   const phases: Phase[] = [
     { at: 0, text: `${names} post offers on the board` },
     { at: 2.8, text: p.version === "v2" ? "Each leg is attached to the ring, signed by its own wallet" : "Each agent signs its leg of the ring" },
-    { at: 5.4, text: `${closer} closes the ring` },
-    { at: 6.9, text: `${closer} submits one execute_intents call to the Verifier` },
+    { at: 5.4, text: p.version === "v2" ? `${closer} calls close_ring on the rings contract` : `${closer} closes the ring` },
+    {
+      at: 6.9,
+      text: p.version === "v2" ? "The rings contract settles every leg in one execute_intents call" : `${closer} submits one execute_intents call to the Verifier`,
+    },
     { at: settleAt, text: `Settled: ${n} agents traded in one transaction` },
   ]
   return { steps, phases, settleAt }
@@ -208,6 +216,7 @@ export interface DirectorNow {
   phase: string
   settled: boolean
   focus: string | null // bot the camera follows
+  pulse: number | null // v2: progress 0..1 of the execute_intents call travelling rings contract -> Verifier
 }
 
 /** Plays rings back to back on the scene clock (seconds). */
@@ -220,7 +229,7 @@ export class Director {
   private homes = new Map<string, [number, number]>()
   private lastT = -1
   private bots = new Map<string, BotNow>()
-  now: DirectorNow = { play: null, phase: "", settled: false, focus: null }
+  now: DirectorNow = { play: null, phase: "", settled: false, focus: null, pulse: null }
 
   setBots(defs: BotDef[]) {
     this.homes = new Map(defs.map((b) => [b.id, b.home]))
@@ -259,7 +268,7 @@ export class Director {
     const c = this.cur
     this.bots.clear()
     if (!c) {
-      this.now = { play: null, phase: "", settled: false, focus: null }
+      this.now = { play: null, phase: "", settled: false, focus: null, pulse: null }
       return
     }
     const lt = t - c.start
@@ -282,6 +291,7 @@ export class Director {
       phase,
       settled: lt >= c.settleAt,
       focus: lt < 5.2 ? c.play.legs[0] : c.play.closer,
+      pulse: c.play.version === "v2" && lt >= PULSE_AT && lt < c.settleAt ? (lt - PULSE_AT) / (c.settleAt - PULSE_AT) : null,
     }
   }
 
