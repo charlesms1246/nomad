@@ -2,12 +2,12 @@
    A (x 0)  : ring f5d3e16f as settled on testnet: a01 (NEAR, nep413) gives USDC,
               0x810d…f371 (Ethereum wallet, erc191) gives USDT, 045329…66c2
               (Solana-style key, raw_ed25519) gives ZEC. One settle, then the
-              real /v2 card for that ring rises on a monitor.
+              real card on the live rings page for that ring rises on a monitor.
    B (x 20) : the mandate vault. A 0.15 USDC leg is signed through Chain
               Signatures; a 0.16 USDC leg is refused with the contract's real
               error text (tx Ht9SdVao…). The refusal is held.
    C (x 40) : the ERC-7683 order from 0xecb3…0452 is stamped "verified on
-              chain", and the real /v2 card of the ring that filled it rises. */
+              chain", and the real card on the live rings page of the ring that filled it rises. */
 "use strict";
 const RINGW = [
   { name: "a01", gives: "USDC", gets: "USDT", tag: [{ t: "NEAR account", size: 0.2 }, { t: "nep413", size: 0.17, color: MUTED, weight: 500 }] },
@@ -43,7 +43,7 @@ registerScene({
     const tags = RINGW.map((d, i) => { const t = label(g, d.tag, { w: 2.0, h: 0.62, res: 240, gap: 0.2 }); subject(t, "tag " + d.name); return t; });
     const T_FLY = 2.45, T_LAND = 3.1;
     const bursts = RINGW.map((d, i) => makeBurst(g, TOK[d.gives], 12, { seed: i * 5 }));
-    const mon = makeMonitor(g, "./assets/screens/v2-ring-f5d3e16fca.png", 6.4, { aspect: 2304 / 1124, standH: 1.4, name: "monitor A" });
+    const mon = makeMonitor(g, "./assets/screens/ring-f5d3e16fca.png", 6.4, { aspect: 2304 / 1124, standH: 1.4, name: "monitor A" });
     SUBJECTS[SUBJECTS.length - 1].crop = t => t >= 5.3 && t < 7.2;   /* the push-in close-up crops the monitor on purpose */
     /* ── B: the mandate vault ── */
     const B = new THREE.Group(); B.position.x = 20; g.add(B); gridFloor(B, 40);
@@ -77,7 +77,7 @@ registerScene({
       { w: 2.3, h: 1.7, size: 0.14, markText: "verified on chain", markColor: ACCENT, markY: -0.6, markW: 1.3 });
     subject(order.g, "order card");
     const ostamp = makeStamp(C, ACCENT); ostamp.g.rotation.x = Math.PI / 2;
-    const monC = makeMonitor(C, "./assets/screens/v2-ring-a44df021aa.png", 3.9, { aspect: 2304 / 1248, standH: 0.9, name: "monitor C" });
+    const monC = makeMonitor(C, "./assets/screens/ring-a44df021aa.png", 3.9, { aspect: 2304 / 1248, standH: 0.9, name: "monitor C" });
     SUBJECTS[SUBJECTS.length - 1].crop = t => t >= 19.8;
     const tokC = makeToken(C, "USDC", 0.42);
 

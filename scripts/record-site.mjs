@@ -1,9 +1,9 @@
 // Record the real Nomad site for the demo video, frame by frame at a steady 30 fps.
 //   node scripts/record-site.mjs <base url> <out dir> [segment ...]
-// Segments: hero, replay, dashboard, v2. Each becomes <out dir>/web-<segment>.mp4 (1920x1080, 30 fps, no audio).
+// Segments: hero, replay, dashboard, rings. Each becomes <out dir>/web-<segment>.mp4 (1920x1080, 30 fps, no audio).
 // Pages render at 1440x810 CSS px with deviceScaleFactor 4/3, so the layout is the desktop one and the output is 1080p.
 // Timers, animation frames and WebGL run on Chrome's virtual time, advanced exactly 1/30 s per frame, so pacing
-// is steady no matter how slow a capture is. Anything that needs the network (the /v2 on-chain checks) is loaded
+// is steady no matter how slow a capture is. Anything that needs the network (the on-chain checks on /rings) is loaded
 // in real time first; after that the scroll position is set per frame from an eased curve.
 // A beat line in the deck's style is drawn over the page (bottom centre); the page itself is not modified.
 import { spawn } from "node:child_process";
@@ -147,14 +147,14 @@ const SEGMENTS = {
       if (!back && t >= 9.8) { back = true; await click("Overview"); }
     }, []); /* no beat line: the workshop's own bottom line names each step, and a beat here would sit on the tab row */
   },
-  /* /v2 with every close re-checked on chain in the browser: three held shots with hard cuts, one per ring card
+  /* /rings with every close re-checked on chain in the browser: three held shots with hard cuts, one per ring card
      (mandate ring, ERC-7683 ring, three-wallet ring). Each is scrolled into place and fully re-rastered before its
      frame is taken: frames grabbed mid-scroll on this page can show stale tiles from before the checks expanded. */
-  async v2() {
+  async rings() {
     await send("Page.navigate", { url: "about:blank" }); await sleep(300);
     await send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => { const si = window.setInterval;
       window.setInterval = function (fn, ms, ...a) { if (ms === 15000) return 0; return si.call(this, fn, ms, ...a); }; })();` });
-    await send("Page.navigate", { url: base + "/v2?verify=1" });
+    await send("Page.navigate", { url: base + "/rings?verify=1" });
     for (let i = 0; i < 90; i++) { await sleep(1000); if ((await ev(`(document.body.innerText.match(/Verified on chain/g) || []).length`)) >= 4) break; }
     await sleep(1500);
     await ev(`document.querySelectorAll('nextjs-portal').forEach(e => e.remove()); 1`);
@@ -167,7 +167,7 @@ const SEGMENTS = {
       { y: await top("f5d3e16fca"), secs: 5, beats: [[0, "Three wallet standards, one settled ring, closed by k4."]] },
     ];
     const { writeFileSync, mkdtempSync } = await import("node:fs"); const os = await import("node:os");
-    const dir = mkdtempSync(join(os.tmpdir(), "v2shots-")); let list = ""; let k = 0; const meta = [];
+    const dir = mkdtempSync(join(os.tmpdir(), "ringshots-")); let list = ""; let k = 0; const meta = [];
     /* the green "Verified on chain" box nearest the middle of the viewport: the push-in target of the shot (0..1 of the frame) */
     const focus = `(() => { const els = [...document.querySelectorAll('div,p')].filter(e => /^\\W*Verified on chain/.test((e.innerText || '').trim()) && e.children.length < 6);
       let best = null, bd = 1e9; for (const e of els) { const r = e.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight || r.height > innerHeight / 2) continue;
@@ -187,15 +187,15 @@ const SEGMENTS = {
       }
       shotList += shotList.split("\n").filter((l) => l.startsWith("file")).at(-1) + "\n";
       writeFileSync(join(dir, `shot${si}.txt`), shotList);
-      const so = join(outDir, `web-v2-${si + 1}.mp4`);
+      const so = join(outDir, `web-rings-${si + 1}.mp4`);
       await new Promise((r) => spawn(FFMPEG, ["-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", join(dir, `shot${si}.txt`),
         "-vf", `scale=1920:1080:flags=lanczos,fps=${FPS}`, "-t", String(sh.secs), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16", "-r", String(FPS), so], { stdio: "inherit" }).on("close", r));
-      meta.push({ file: `web-v2-${si + 1}.mp4`, secs: sh.secs, cx: +cx.toFixed(4), cy: +cy.toFixed(4) });
+      meta.push({ file: `web-rings-${si + 1}.mp4`, secs: sh.secs, cx: +cx.toFixed(4), cy: +cy.toFixed(4) });
     }
-    writeFileSync(join(outDir, "web-v2.json"), JSON.stringify(meta, null, 1));
+    writeFileSync(join(outDir, "web-rings.json"), JSON.stringify(meta, null, 1));
     list += list.split("\n").filter((l) => l.startsWith("file")).at(-1) + "\n";
     writeFileSync(join(dir, "list.txt"), list);
-    const out = join(outDir, "web-v2.mp4"), total = shots.reduce((a, s) => a + s.secs, 0);
+    const out = join(outDir, "web-rings.mp4"), total = shots.reduce((a, s) => a + s.secs, 0);
     await new Promise((r) => spawn(FFMPEG, ["-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", join(dir, "list.txt"),
       "-vf", `scale=1920:1080:flags=lanczos,fps=${FPS}`, "-t", String(total), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16", "-r", String(FPS), out], { stdio: "inherit" }).on("close", r));
     console.log(`wrote ${out}: ${shots.length} shots, ${total} s`);

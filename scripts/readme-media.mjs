@@ -1,5 +1,5 @@
 // README stills from the real site: media/landing.png (hero), media/dashboard.png (the workshop mid-settle),
-// media/v2-verified.png (ring f5d3e16fca with its green "Verified on chain" box). 1440 px wide.
+// media/rings-verified.png (ring f5d3e16fca with its green "Verified on chain" box). 1440 px wide.
 //   node scripts/readme-media.mjs <base url> [out dir = media]
 import { spawn } from "node:child_process";
 import { writeFileSync, mkdirSync, readdirSync, existsSync } from "node:fs";
@@ -35,13 +35,13 @@ try {
   for (let i = 0; i < 400; i++) { await sleep(50); if (await ev(`document.body.innerText.includes('Settled: 3 agents traded in one transaction')`)) break; }
   await sleep(180); await shot("dashboard.png");
 
-  /* /v2?verify=1: wait for the on-chain checks, then the three-wallet ring card */
-  await go("/v2?verify=1");
+  /* /rings?verify=1: wait for the on-chain checks, then the three-wallet ring card */
+  await go("/rings?verify=1");
   for (let i = 0; i < 90; i++) { await sleep(1000); if ((await ev(`(document.body.innerText.match(/Verified on chain/g) || []).length`)) >= 4) break; }
   await sleep(1000);
   await ev(`(() => { const h = [...document.querySelectorAll('span,div')].find(e => e.innerText && e.innerText.trim() === 'Ring f5d3e16fca');
     let c = h; while (c && c.parentElement && !/rounded/.test(c.className || '')) c = c.parentElement;
     window.scrollTo(0, Math.max(0, c.getBoundingClientRect().top + scrollY - 40)); return 1; })()`);
-  await sleep(1200); await shot("v2-verified.png");
+  await sleep(1200); await shot("rings-verified.png");
 } finally { chrome.kill(); ws.close(); }
 process.exit(0);
