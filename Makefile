@@ -4,7 +4,7 @@
 #   make sim        no chain, no keys: seeded swarm, summary line + out/*.svg
 #   make dry-run    simulate_intents on our testnet Verifier for fixtures/rings/*.json (no keys)
 #   make test       unit, property and end-to-end tests (TS + Rust)
-#   make ui         Next.js UI on :3000 (reads MATCHER_URL, else a labelled mock)
+#   make ui         Next.js UI on :3000 (reads MATCHER_URL, else recorded real testnet data, labelled)
 #   make live       matcher + agents on testnet (needs keys from `make accounts`)
 #   make race       two matchers (Verifier's shard vs another shard) on the same offers
 #   make fixtures   sign fresh demo rings for dry-run
