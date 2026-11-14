@@ -22,6 +22,8 @@
 //! (agent id -> uri, registered by); `close_ring` writes outcomes automatically: rings settled per
 //! agent, rings closed per closer, failed closes per ring.
 
+pub mod order;
+use order::{Order, OrderInput};
 use near_sdk::collections::{LookupMap, Vector};
 use near_sdk::json_types::U128;
 use near_sdk::serde_json::{self, json, Value};
@@ -39,6 +41,8 @@ enum Key {
     Rings,
     RingIds,
     Rep,
+    Orders,
+    OrderByKey,
 }
 
 #[near(serializers = [json, borsh])]
@@ -109,6 +113,25 @@ pub struct Rings {
     ring_ids: Vector<String>,
     rep: LookupMap<String, Reputation>,
     total_settled: u64,
+    /// ERC-7683 orders (id -> order) and the live order for (user|give|want).
+    orders: LookupMap<String, Order>,
+    order_by_key: LookupMap<String, String>,
+}
+
+/// State layout before ERC-7683 orders were added (for `migrate`).
+#[near(serializers = [borsh])]
+pub struct RingsV1 {
+    owner: AccountId,
+    verifier: AccountId,
+    fee_pips: u32,
+    rings: LookupMap<String, Ring>,
+    ring_ids: Vector<String>,
+    rep: LookupMap<String, Reputation>,
+    total_settled: u64,
+}
+
+fn order_key(user: &str, give: &str, want: &str) -> String {
+    format!("{}|{}|{}", user.to_ascii_lowercase(), give, want)
 }
 
 pub fn fee_of(x: u128, fee_pips: u32) -> u128 {
@@ -240,7 +263,60 @@ impl Rings {
             ring_ids: Vector::new(Key::RingIds),
             rep: LookupMap::new(Key::Rep),
             total_settled: 0,
+            orders: LookupMap::new(Key::Orders),
+            order_by_key: LookupMap::new(Key::OrderByKey),
         }
+    }
+
+    /// One-time state upgrade from the layout without orders. Owner only.
+    #[init(ignore_state)]
+    #[private]
+    pub fn migrate() -> Self {
+        let old: RingsV1 = env::state_read().unwrap_or_else(|| env::panic_str("no state"));
+        Self {
+            owner: old.owner,
+            verifier: old.verifier,
+            fee_pips: old.fee_pips,
+            rings: old.rings,
+            ring_ids: old.ring_ids,
+            rep: old.rep,
+            total_settled: old.total_settled,
+            orders: LookupMap::new(Key::Orders),
+            order_by_key: LookupMap::new(Key::OrderByKey),
+        }
+    }
+
+    /// ERC-7683 ingress: anyone relays a `GaslessCrossChainOrder` signed (EIP-712) by an EVM wallet.
+    /// The contract recomputes the digest, recovers the signer and records the order as that 0x
+    /// address's standing limit for (give, want). Returns the order id.
+    #[payable]
+    pub fn submit_order(&mut self, order: OrderInput, signature: String) -> String {
+        let now_s = env::block_timestamp_ms() / 1000;
+        require!((order.open_deadline as u64) >= now_s, "order's openDeadline has passed");
+        require!((order.fill_deadline as u64) > now_s, "order's fillDeadline has passed");
+        require!(order.give != order.want && order.give_amount.0 > 0 && order.min_want_amount.0 > 0, "bad order terms");
+        let digest = order::order_digest(&order).unwrap_or_else(|e| env::panic_str(&e));
+        let signer = order::recover(&digest, &signature).unwrap_or_else(|e| env::panic_str(&e));
+        require!(signer.eq_ignore_ascii_case(&order.user), format!("signed by {signer}, order is for {}", order.user));
+        let digest_hex: String = digest.iter().map(|x| format!("{x:02x}")).collect();
+        let id = digest_hex[..32].to_string();
+        let key = order_key(&order.user, &order.give, &order.want);
+        let rec = Order { id: id.clone(), input: order, filled: U128(0), digest: digest_hex };
+        let payer = env::predecessor_account_id();
+        self.with_storage(&payer, |s| {
+            s.orders.insert(&id, &rec);
+            s.order_by_key.insert(&key, &id);
+        });
+        emit("order_received", json!({ "order_id": id, "user": rec.input.user, "give": rec.input.give, "give_amount": rec.input.give_amount, "want": rec.input.want, "min_want_amount": rec.input.min_want_amount, "standard": "ERC-7683 GaslessCrossChainOrder (EIP-712)" }));
+        id
+    }
+
+    pub fn get_order(&self, order_id: String) -> Option<Order> {
+        self.orders.get(&order_id)
+    }
+
+    pub fn order_for(&self, user: String, give: String, want: String) -> Option<Order> {
+        self.order_by_key.get(&order_key(&user, &give, &want)).and_then(|id| self.orders.get(&id))
     }
 
     /// Anyone proposes a ring. The attached deposit covers its storage; the excess is refunded.
@@ -250,6 +326,18 @@ impl Rings {
         require!(deadline_ms > now && deadline_ms <= now + MAX_DEADLINE_AHEAD_MS, "deadline must be within the next hour");
         if let Err(e) = check_ring(&legs, self.fee_pips) {
             env::panic_str(&e);
+        }
+        // a leg whose signer has a live ERC-7683 order for (give, want) must respect it
+        for (i, l) in legs.iter().enumerate() {
+            if let Some(o) = self.order_for(l.agent.clone(), l.give.clone(), l.get.clone()) {
+                if (o.input.fill_deadline as u64) * 1000 > now {
+                    require!(l.give_amt.0 <= o.input.give_amount.0 - o.filled.0, format!("leg {i} gives more than order {} has left", o.id));
+                    require!(
+                        l.get_amt.0 * o.input.give_amount.0 >= o.input.min_want_amount.0 * l.give_amt.0,
+                        format!("leg {i} pays less than order {}'s minimum price", o.id)
+                    );
+                }
+            }
         }
         let proposer = env::predecessor_account_id();
         let seed = format!("{}|{}|{}|{}", serde_json::to_string(&legs).unwrap(), deadline_ms, proposer, env::block_height());
@@ -402,6 +490,10 @@ impl Rings {
             ring.settled_ms = Some(now_ms);
             self.total_settled += 1;
             for l in &ring.legs {
+                if let Some(mut o) = self.order_for(l.agent.clone(), l.give.clone(), l.get.clone()) {
+                    o.filled = U128(o.filled.0 + l.give_amt.0);
+                    self.orders.insert(&o.id.clone(), &o);
+                }
                 let mut r = self.rep.get(&l.agent).unwrap_or_default();
                 r.rings_settled += 1;
                 self.rep.insert(&l.agent, &r);
