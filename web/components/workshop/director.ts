@@ -55,10 +55,10 @@ const NAMED: Record<string, string> = {
 const EXTRA = ["#627eea", "#14b890", "#e0a458", "#a3b18a", "#d4776b", "#6c9bd2"]
 
 /** "a01.nomadswarm.testnet" -> "a01"; "0x810d…f371"; 64-hex -> "0453…66c2". */
-export function shortName(account: string): string {
+export function shortName(account: string, tiny = false): string {
   const a = account.replace(/\s*\(.*\)$/, "")
-  if (/^0x[0-9a-f]{40}$/i.test(a)) return `${a.slice(0, 6)}…${a.slice(-4)}`
-  if (/^[0-9a-f]{64}$/i.test(a)) return `${a.slice(0, 4)}…${a.slice(-4)}`
+  if (/^0x[0-9a-f]{40}$/i.test(a)) return tiny ? `${a.slice(0, 4)}…${a.slice(-2)}` : `${a.slice(0, 6)}…${a.slice(-4)}`
+  if (/^[0-9a-f]{64}$/i.test(a)) return tiny ? `${a.slice(0, 4)}…${a.slice(-2)}` : `${a.slice(0, 4)}…${a.slice(-4)}`
   return a.replace(/\.nomadswarm\.testnet$/, "")
 }
 
@@ -137,13 +137,16 @@ export function buildBots(state: NomadState | null, plays: Play[]): BotDef[] {
 }
 
 const DOCK_DISTANCE = 2.3
-const SLOT = 1.55
 
 function dock(station: StationId, slot: number, count: number): [number, number] {
-  // Queue in a row along x on the camera side of the station, so every bot in it stays readable.
+  // One bot docks straight in front. A group stands on an arc in front of the station (camera side) whose radius
+  // grows with the group, so neighbours stay about two bot widths apart and sit at different depths.
   const [sx, sz] = stationPos(station)
-  const lat = (slot - (count - 1) / 2) * SLOT
-  return [sx + lat, sz + DOCK_DISTANCE]
+  if (count <= 1) return [sx, sz + DOCK_DISTANCE]
+  const r = DOCK_DISTANCE + 0.35 * count
+  const spread = Math.min(2.6, (2.1 * (count - 1)) / r) // total arc in radians
+  const a = -spread / 2 + (slot / (count - 1)) * spread
+  return [sx + Math.sin(a) * r, sz + Math.cos(a) * r]
 }
 
 interface Step {
@@ -181,7 +184,7 @@ function script(p: Play): { steps: Step[]; phases: Phase[]; settleAt: number } {
   if (p.version === "v2") steps.push({ at: 9.4, bot: p.closer, to: dock("reputation", 0, 1), task: "reputation updated" })
   for (const a of p.legs) steps.push({ at: 10.0, bot: a, to: "home", task: null })
   steps.push({ at: p.version === "v2" ? 11.0 : 10.0, bot: p.closer, to: "home", task: null })
-  const names = p.legs.map(shortName).join(", ")
+  const names = p.legs.map((a) => shortName(a)).join(", ")
   const phases: Phase[] = [
     { at: 0, text: `${names} post offers on the board` },
     { at: 2.8, text: p.version === "v2" ? "Each leg is attached to the ring, signed by its own wallet" : "Each agent signs its leg of the ring" },
@@ -197,6 +200,7 @@ export interface BotNow {
   task: string | null
   hopAt: number | null // seconds (scene clock) when the settle hop started
   inRing: boolean
+  raise: boolean // label above the head instead of under the feet (alternate ring members)
 }
 
 export interface DirectorNow {
@@ -260,6 +264,7 @@ export class Director {
     }
     const lt = t - c.start
     const members = new Set([...c.play.legs, c.play.closer])
+    const order = new Map([...c.play.legs, c.play.closer].map((a, i) => [a, i] as const))
     for (const s of c.steps) {
       if (s.at > lt) continue
       const home = this.homes.get(s.bot) ?? [0, 0]
@@ -268,6 +273,7 @@ export class Director {
         task: s.task,
         hopAt: lt >= c.settleAt ? c.start + c.settleAt : null,
         inRing: members.has(s.bot),
+        raise: order.get(s.bot)! % 2 === 1,
       })
     }
     const phase = [...c.phases].reverse().find((p) => p.at <= lt)?.text ?? ""
@@ -286,6 +292,6 @@ export class Director {
 
   get(id: string, t: number): BotNow {
     this.update(t)
-    return this.bots.get(id) ?? { target: this.homes.get(id) ?? [0, 0], task: null, hopAt: null, inRing: false }
+    return this.bots.get(id) ?? { target: this.homes.get(id) ?? [0, 0], task: null, hopAt: null, inRing: false, raise: false }
   }
 }

@@ -7,7 +7,7 @@ import type { NomadState } from "@/lib/types"
 import fallbackState from "@/lib/live-snapshot.json"
 import { Bot, specFor } from "./bot"
 import { StationBlock } from "./station"
-import { Director, STATIONS, buildBots, extraPlays, settledPlays, type BotDef, type DirectorNow } from "./director"
+import { Director, STATIONS, buildBots, extraPlays, settledPlays, shortName, type BotDef, type DirectorNow } from "./director"
 import { LabelContext, LabelProjector, labelEl, newLabelStore, type LabelStore } from "./labels"
 
 export interface RingWorkshopProps {
@@ -83,6 +83,17 @@ export function RingWorkshopScene({ state, height = 520 }: RingWorkshopProps) {
     director.setBots(bots)
   }, [director, bots])
 
+  // Under 640 px wide (phones): short wallet names, no station sublabels.
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setNarrow(e.contentRect.width < 640))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   const [cameraMode, setCameraMode] = useState<CameraMode>("overview")
   const botRefs = useRef<Record<string, Group | null>>({})
   const registerBotGroup = useCallback((id: string, group: Group | null) => {
@@ -91,14 +102,17 @@ export function RingWorkshopScene({ state, height = 520 }: RingWorkshopProps) {
   const [labels] = useState<LabelStore>(newLabelStore)
 
   // The DOM overlay (tasks, phase line) refreshes a few times a second; positions update every frame.
-  const [overlay, setOverlay] = useState<{ now: DirectorNow; members: Record<string, boolean> }>({
+  const [overlay, setOverlay] = useState<{ now: DirectorNow; members: Record<string, { shown: boolean; raise: boolean }> }>({
     now: director.now,
     members: {},
   })
   useEffect(() => {
     const id = setInterval(() => {
-      const members: Record<string, boolean> = {}
-      for (const b of bots) members[b.id] = !!director.peek(b.id)?.inRing
+      const members: Record<string, { shown: boolean; raise: boolean }> = {}
+      for (const b of bots) {
+        const p = director.peek(b.id)
+        members[b.id] = { shown: !!p?.inRing, raise: !!p?.raise }
+      }
       setOverlay({ now: director.now, members })
     }, 200)
     return () => clearInterval(id)
@@ -110,7 +124,7 @@ export function RingWorkshopScene({ state, height = 520 }: RingWorkshopProps) {
   const txUrl = now.settled && now.play?.tx ? `${effective.meta.explorerTxUrl}${now.play.tx}` : null
 
   return (
-    <div className="relative w-full overflow-hidden rounded-lg">
+    <div ref={boxRef} className="relative w-full overflow-hidden rounded-lg">
       <div style={{ height }} className="relative w-full">
         <Canvas
           dpr={[1, 2]}
@@ -153,12 +167,12 @@ export function RingWorkshopScene({ state, height = 520 }: RingWorkshopProps) {
           {STATIONS.map((s) => (
             <div key={s.id} data-align="bottom" ref={labelEl(labels, `station:${s.id}`)} className="absolute left-0 top-0 flex flex-col items-center gap-1 whitespace-nowrap" style={{ transform: "translate(-9999px,-9999px)" }}>
               <span className="rounded-sm border border-white/15 bg-black/75 px-2 py-0.5 text-[11px] font-medium text-white">{s.label}</span>
-              <span className="rounded-sm bg-black/55 px-1.5 text-[10px] leading-4 text-white/65">{s.subLabel}</span>
+              {!narrow && <span className="rounded-sm bg-black/55 px-1.5 text-[10px] leading-4 text-white/65">{s.subLabel}</span>}
             </div>
           ))}
           {/* Names only for the bots in the current ring; the bottom line says what is happening */}
           {bots.map((b) => (
-            <BotLabel key={b.id} def={b} store={labels} shown={!!overlay.members[b.id]} />
+            <BotLabel key={b.id} def={b} store={labels} narrow={narrow} shown={!!overlay.members[b.id]?.shown} raise={!!overlay.members[b.id]?.raise} />
           ))}
         </div>
 
@@ -199,16 +213,30 @@ export function RingWorkshopScene({ state, height = 520 }: RingWorkshopProps) {
   )
 }
 
-function BotLabel({ def, store, shown }: { def: BotDef; store: LabelStore; shown: boolean }) {
+function BotLabel({ def, store, shown, raise, narrow }: { def: BotDef; store: LabelStore; shown: boolean; raise: boolean; narrow: boolean }) {
   const color = useMemo(() => specFor(def.color).accent, [def.color])
-  return (
-    <div ref={labelEl(store, `bot:${def.id}`)} className="absolute left-0 top-0 whitespace-nowrap" style={{ transform: "translate(-9999px,-9999px)" }}>
+  const name = narrow ? shortName(def.id, true) : def.name
+  // Two placements, under the feet and above the head; alternate ring members use the upper one so neighbours never share a line.
+  const tag = (top: boolean) => (
+    <div
+      key={top ? "top" : "bottom"}
+      data-align={top ? "bottom" : undefined}
+      ref={labelEl(store, `${top ? "bot-top" : "bot"}:${def.id}`)}
+      className="absolute left-0 top-0 whitespace-nowrap"
+      style={{ transform: "translate(-9999px,-9999px)" }}
+    >
       <span
         className="rounded-sm bg-black/60 px-1 text-[11px] font-semibold transition-opacity duration-200"
-        style={{ color, opacity: shown ? 1 : 0 }}
+        style={{ color, opacity: shown && raise === top ? 1 : 0 }}
       >
-        {def.name}
+        {name}
       </span>
     </div>
+  )
+  return (
+    <>
+      {tag(false)}
+      {tag(true)}
+    </>
   )
 }

@@ -66,6 +66,7 @@ export function Bot({
   const dimRef = useRef(1)
   const spec = useMemo(() => specFor(def.color), [def.color])
   const anchor = useLabel(`bot:${def.id}`)
+  const topAnchor = useLabel(`bot-top:${def.id}`)
   const seed = useMemo(() => [...def.id].reduce((s, ch) => s + ch.charCodeAt(0), 0), [def.id])
 
   useEffect(() => {
@@ -249,6 +250,7 @@ export function Bot({
 
       {/* Nameplate anchor (label drawn in the DOM overlay) */}
       <group ref={anchor} position={[0, -0.2, 0]} />
+      <group ref={topAnchor} position={[0, 2.45, 0]} />
     </group>
   )
 }
