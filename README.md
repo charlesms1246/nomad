@@ -2,7 +2,23 @@
 
 **Agents and wallets trade in rings that settle atomically on NEAR Intents. Each one signs only its own leg, and anyone can close the ring.**
 
-Tracks: **AI Swarms** and **DeFi**. Network: **NEAR testnet**. Live site: **https://nomad.charlesms.dev**
+![A three-wallet ring settling on NEAR testnet](media/nomad-hero.gif)
+
+Tracks: **AI Swarms** and **DeFi**. Network: **NEAR testnet**. Live site: **https://nomad.charlesms.dev**. One keyless check: **`make demo`**.
+
+| 27 rings settled, 0 failed | 3 wallet standards | 0 access keys | Same code hash as mainnet | 125 TS + 70 Rust tests |
+|---|---|---|---|---|
+| in a 36-minute live run with 12 agents | `nep413`, `erc191` and `raw_ed25519` legs settled in one ring | on the rings and mandate contracts | our Verifier runs `intents.near`'s exact wasm | `make test`, and in CI on every push |
+
+## Why it matters
+
+- **Parties trade with each other, with no solver in the middle.** Each leg carries the price its party signed. In on-chain closing, the only payment is the tip each party signs to whoever closes the ring, which was 0.1% in our runs.
+- **Settlement is atomic across many parties.** 2 to 5 wallets settle in one `execute_intents` call. Every leg executes or none does, and no escrow holds anyone's funds.
+- **It works with any wallet, and with agents under on-chain limits.** NEAR keys, Ethereum keys (including EIP-712 orders) and ed25519 keys can trade in one ring. An agent can trade from an Ethereum address that a contract controls through Chain Signatures. That address has no private key, and every leg is checked against the owner's limits before it is signed.
+
+## Why NEAR
+
+NEAR Intents' `execute_intents` accepts intents signed by many accounts under different wallet standards and commits them all or none. That one call is Nomad's whole settlement layer. On testnet it settled a ring of `nep413`, `erc191` and `raw_ed25519` legs in [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR). NEAR Chain Signatures let `mandate.nomadswarm.testnet` own an Ethereum address with no private key and sign legs for it only after on-chain checks. A leg signed that way settled in [`2WgJbhRW…`](https://testnet.nearblocks.io/txns/2WgJbhRWZJhy38nCxSLeb2FPXCN4SaX9TmvhakBcPrr9). Cross-contract calls let the rings contract settle a ring for any caller and pay that caller the tips in the same flow.
 
 ## The problem
 
@@ -28,19 +44,64 @@ Around this, Nomad adds:
 - **Permissionless close.** Anyone can propose a ring, attach a signed leg, or close a fully signed ring and collect its tips. Nobody needs an allowlist, and no matcher takes a cut.
 - **Any wallet.** One ring can mix NEAR keys, Ethereum keys and raw ed25519 (Solana-style) keys.
 - **ERC-7683 orders.** An Ethereum wallet signs one EIP-712 order. The contract enforces the order's minimum price on every ring that includes that wallet.
-- **On-chain mandates.** A contract signs legs for an agent through NEAR Chain Signatures, and only within limits that the owner sets. No private key for that agent exists anywhere.
+- **On-chain mandates.** A contract signs legs for an agent through NEAR Chain Signatures, and only within limits that the owner sets. Nobody holds a private key for that agent's address.
 - **Reputation.** The contract counts the rings each account settled, the rings it closed and its legs in failed closes.
 - **One-of-N commitments.** A party may sign legs for several competing rings that all fill the same offer. All of them share one Verifier nonce, so at most one can ever execute.
 - **An agent swarm.** Twelve agents post offers. Matchers find rings, and the agents auction their legs between the matchers on price.
 
-## Try it in 5 minutes, no install
+## Try it
 
-All you need is a browser. Every page reads NEAR testnet live, and nothing on them can move funds.
+### Quick check: `make demo`
 
-1. **Watch a ring settle.** Open https://nomad.charlesms.dev and scroll to **One ring, start to finish**. It replays a real three-wallet ring step by step, from proposal to tips, with a link to every transaction.
+On a fresh clone, with Node 20+ and pnpm 9 (`corepack enable`), and with no keys:
+
+```sh
+git clone https://github.com/charlesms1246/nomad.git && cd nomad && make demo
+```
+
+It installs, builds and runs four checks in about 10 seconds after the install. Trimmed output:
+
+```
+== 1/4 make sim: 20 agents, 5 tokens, no chain. See: rings settled, share of offers cleared by rings
+sim backend=ledger (7 ms) agents=20 tokens=5 seed=1 rounds=30: settled 11 rings (k=2:5 k=3:3 k=4:2 k=5:1), cleared 47% of offers by rings (18/38), 53% fell back to 1Click; ... failed rings 0
+== 2/4 make dry-run: signed 3/4/5-party rings through simulate_intents on our testnet Verifier (read-only). See: k+1 intents_executed
+ring-3.json: simulate_intents on intents.nomadswarm.testnet: 4 intents_executed (3 agents + matcher)
+ring-4.json: simulate_intents on intents.nomadswarm.testnet: 5 intents_executed (4 agents + matcher)
+ring-5.json: simulate_intents on intents.nomadswarm.testnet: 6 intents_executed (5 agents + matcher)
+== 3/4 make mainnet-proof: a Nomad-signed ring through simulate_intents on MAINNET intents.near (read-only). See: signatures pass, stops at the balance check
+ring (3 agents), leg 1 first: insufficient balance or overflow
+control: corrupted signature: invalid signature
+control: zero salt: invalid salt
+PASS: for each of the 3 agents' legs ..., mainnet intents.near accepts Nomad's NEP-413 signature, versioned nonce and salt and stops only at the balance check ...
+== 4/4 on-chain check of ring f5d3e16f (3 wallet standards, closed by a stranger), read from testnet RPC. See: PASS lines
+PASS  status Settled, closer k4.nomadswarm.testnet
+PASS  closed by k4.nomadswarm.testnet, which is not one of the ring's 3 parties
+PASS  tx GALT4S7B… is k4.nomadswarm.testnet -> rings.nomadswarm.testnet.close_ring({ring_id: f5d3e16f…})
+PASS  intents.nomadswarm.testnet executed execute_intents successfully
+PASS  3 token_diff events for 3 legs
+PASS  leg 0 (nep413): executed diff equals the signed spec -1000000/+999999
+PASS  leg 1 (erc191): executed diff equals the signed spec -1000000/+999999
+PASS  leg 2 (raw_ed25519): executed diff equals the signed spec -1000000/+999999
+PASS  tip 1000 usdc paid to the closer
+PASS  intents.nomadswarm.testnet code hash BtA1BEFNS619KkvXFsgcpQ21Tb5yMm32aaUkn7xNothk = mainnet intents.near
+PASS: ring settled atomically on testnet, closed by a non-party, every leg executed exactly as signed
+demo: all four checks passed. No keys used, no transactions sent.
+```
+
+The on-chain check is [scripts/check-ring.ts](scripts/check-ring.ts). It reads the ring from the rings contract and fetches the close transaction from an archival RPC. It checks that the transaction is `close_ring` from a non-party, and that each executed `token_diff` equals the leg that was signed. It also checks that each tip reached the closer and that the Verifier's code hash equals mainnet's.
+
+### In the browser, in 5 minutes
+
+All you need is a browser. `/` and `/v2` read NEAR testnet live, `/dashboard` replays recorded testnet data, and no page can move funds.
+
+1. **Watch a ring settle.** Open https://nomad.charlesms.dev and scroll to **One ring, start to finish**. It replays a real three-wallet ring step by step, from proposal to tips, with links to the real transactions.
 2. **Verify every ring.** Open https://nomad.charlesms.dev/v2?verify=1. Each closed ring gets a green **Verified on chain** box once your browser has re-checked it against the Verifier.
 3. **See the agents.** Open https://nomad.charlesms.dev/dashboard to watch the agents trade in rings, replayed from recorded testnet data.
 4. **Check one transaction.** Open [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR) on NearBlocks. `k4` calls `close_ring`, one `execute_intents` settles all three legs, and the tips go to `k4`.
+
+![Landing page: the ring replay](media/landing.png)
+![/v2?verify=1: every close re-checked on chain](media/v2-verified.png)
+![/dashboard: the agent swarm](media/dashboard.png)
 
 ## How it works
 
@@ -178,6 +239,31 @@ flowchart LR
 
 In this mode the matcher adds its own fee leg to the batch. Matchers compete on that fee, because each agent signs only the best-paying proposal in its auction window.
 
+## Feature → code → test
+
+`make test` runs every test named here except the live ones, and CI runs `make test` on every push. Rust test names are functions in `contracts/<name>/src/tests.rs`.
+
+| Feature | Code | Test |
+|---|---|---|
+| Ring checks: a 2–5 cycle, every token nets to zero after the fee | `check_ring`, `propose_ring` in [contracts/rings/src/lib.rs](contracts/rings/src/lib.rs) | `a_valid_ring_passes_and_needs_no_matcher_leg`, `rejects_exact_zero_sum_without_fee`, `rejects_non_cycles_duplicates_and_bad_sizes`, `fee_is_a_ceiling` |
+| A leg must commit to exactly its spec, in any wallet standard | `check_leg_message`, `attach_leg` in [contracts/rings/src/lib.rs](contracts/rings/src/lib.rs) | `propose_attach_any_standard`, `rejects_a_leg_with_the_wrong_amount`, `rejects_a_leg_signed_by_someone_else`, `rejects_tips_to_anyone_but_this_contract_and_extra_intents` |
+| Permissionless close, tips to the closer, reputation | `close_ring`, `on_close`, `apply_outcome`, `register_agent` in [contracts/rings/src/lib.rs](contracts/rings/src/lib.rs) | `close_needs_every_leg`, `settlement_pays_tips_to_the_closer_and_writes_reputation`, `a_failed_close_moves_nothing_and_counts_against_the_ring`, `identity_registration`. On chain: [scripts/check-ring.ts](scripts/check-ring.ts) (`make demo`) |
+| ERC-7683 orders: EIP-712 digest, `ecrecover`, minimum price enforced | [contracts/rings/src/order.rs](contracts/rings/src/order.rs), `submit_order`; signer [packages/intents/src/erc7683.ts](packages/intents/src/erc7683.ts) | `erc7683_order_data_and_digest_match_the_ts_vector`, `erc7683_ecrecover_finds_the_signer`, `submit_order_then_a_ring_below_the_order_price_is_rejected`; [erc7683.test.ts](packages/intents/test/erc7683.test.ts) with the shared [golden vector](packages/intents/test/fixtures/erc7683-vector.json) |
+| Mandate limits (tokens, per-leg max, daily budget, minimum price) and MPC signing | [contracts/mandate/src/lib.rs](contracts/mandate/src/lib.rs) | `accepts_a_good_leg`, `rejects_each_rule`, `daily_budget_accounting`, `nonce_reuse_and_budget_rejected`, `request_sign_callback_roundtrip`, `failed_or_foreign_signature_refunds_budget`, `revoked_mandate_cannot_sign`, `erc191_prehash_known_vector` |
+| `nep413` signing and versioned nonces | [packages/intents/src/nep413.ts](packages/intents/src/nep413.ts), [nonce.ts](packages/intents/src/nonce.ts) | [intents.test.ts](packages/intents/test/intents.test.ts) (golden vector, cross-checked against `node:crypto`) |
+| `erc191` and `raw_ed25519` signing | [packages/intents/src/standards.ts](packages/intents/src/standards.ts) | [standards.test.ts](packages/intents/test/standards.test.ts) |
+| One-of-N commitments: one nonce per offer, rotated after `nonce was already used` | [apps/agent/src/runtime.ts](apps/agent/src/runtime.ts) | [race.test.ts](apps/matcher/test/race.test.ts), [race2.test.ts](apps/matcher/test/race2.test.ts); attack A7 on chain |
+| Ring finder: cycle search, fee-correct sizing, surplus split | [packages/ringfinder/src/index.ts](packages/ringfinder/src/index.ts) | [ringfinder.test.ts](packages/ringfinder/test/ringfinder.test.ts) (property tests) |
+| `legCheck`: an agent never signs outside its offer | [apps/agent/src/legCheck.ts](apps/agent/src/legCheck.ts) | [legCheck.test.ts](apps/agent/test/legCheck.test.ts), [legCheck.prop.test.ts](apps/agent/test/legCheck.prop.test.ts) (fast-check through the real signing path) |
+| Fee auction: matchers compete on their cut | `onProposalAsync` in [apps/agent/src/runtime.ts](apps/agent/src/runtime.ts) | [fee-competition.test.ts](apps/matcher/test/fee-competition.test.ts) |
+| Matcher loop: propose, collect, simulate, execute | [apps/matcher/src/matcher.ts](apps/matcher/src/matcher.ts) | [matcher.test.ts](apps/matcher/test/matcher.test.ts) |
+| Local Verifier model | [packages/verifier-model/src/index.ts](packages/verifier-model/src/index.ts) | [model.test.ts](packages/verifier-model/test/model.test.ts); [differential.live.ts](packages/verifier-model/test/differential.live.ts) against testnet (live, not in `make test`) |
+| Offer board | [contracts/board/src/lib.rs](contracts/board/src/lib.rs) | 40 tests in [contracts/board/src/tests.rs](contracts/board/src/tests.rs) |
+| 1Click baseline, with the fallback refused on testnet | [packages/oneclick/src/fallback.ts](packages/oneclick/src/fallback.ts) | [fallback.test.ts](packages/oneclick/test/fallback.test.ts) |
+| Signatures accepted by mainnet `intents.near` | [scripts/mainnet-simulate.ts](scripts/mainnet-simulate.ts) | `make mainnet-proof` (read-only) |
+| `/v2?verify=1`: re-checks every close on chain in the browser | [web/components/V2Rings.tsx](web/components/V2Rings.tsx) | No unit test. [scripts/check-ring.ts](scripts/check-ring.ts) runs the same checks from the command line. `make ui-check` screenshots |
+| Landing ring replay | [web/components/landing/RingReplay.tsx](web/components/landing/RingReplay.tsx) | `make ui-check` screenshots |
+
 ## Proof on testnet
 
 Every link goes to NearBlocks.
@@ -313,7 +399,7 @@ Then open:
 - http://localhost:3000/v2?verify=1 for the on-chain rings, re-checked as the page loads;
 - http://localhost:3000/dashboard for the swarm view, playing back recorded testnet data unless `MATCHER_URL` points to a running matcher. `make sim-serve` in another terminal serves a live simulation, which the page labels Simulation.
 
-`make ui-check` (stop any running `web/` dev server first) starts a sim matcher and the dev UI. It then saves headless screenshots of `/`, `/v2` and `/dashboard` at 1440 px and 390 px to `out/ui-check/`.
+`make ui-check` (stop any running `web/` dev server first) starts a sim matcher and the dev UI. It then saves headless screenshots to `out/ui-check/`: `/` and `/v2` at 1440 px and 390 px, and `/dashboard` at 1440 px.
 
 **Read the contracts with no tools but `curl`**
 
@@ -395,6 +481,13 @@ All on NEAR testnet.
 | Agents | `a01`–`a12.nomadswarm.testnet` | Each agent has its own Verifier key |
 
 You can confirm that the contracts have no keys with `view_access_key_list`, which returns `[]` for both.
+
+## What is real vs simulated
+
+- **Real, on NEAR testnet:** every transaction linked in this README, including the ring settlements, stranger closes, ERC-7683 order checks, mandate signatures through the live MPC network, attacks and kill tests. The parties are our own agents and fresh test wallets, trading test tokens with no market value.
+- **Real, read-only on mainnet:** `make mainnet-proof` (`simulate_intents` on `intents.near`), the Verifier code-hash comparison and the 1Click quotes used as a baseline. No mainnet transaction is ever sent.
+- **Simulated, locally:** `make sim` and `make sim-serve`. Offers are random, and the agents and the ledger (or the Verifier model) run in one process.
+- **Recorded:** `/dashboard` plays back a testnet state that we recorded. It is labelled as recorded, and its transaction links are real. `/` and `/v2` read testnet live in the browser. `/` falls back to a saved copy of the same ring if RPC is unreachable.
 
 ## Limits
 
