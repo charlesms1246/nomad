@@ -21,6 +21,7 @@ import { WsLink, startServer } from "./server.js";
 import { buildState } from "./state.js";
 import { loadConfig, agentIds, readKey, repoRoot, AGENT_PLAN } from "./config.js";
 import { SIM_TOKENS } from "./sim.js";
+import { fundAgents } from "./fund.js";
 import type { Ring as UiRing, RaceStats } from "./types.js";
 
 const env = (k: string, d: string) => process.env[k] ?? d;
@@ -272,6 +273,12 @@ async function main() {
         });
         log("race", { ring: r.ringId.slice(0, 12), ...Object.fromEntries(res.map((x, i) => [racers[i]!.label.split(".")[0], [x.status, x.blocksToExec]])) });
       }
+    }
+    // AUTO_FUND=N: every N rounds, top up agents whose inventory dropped below half their plan
+    const autoFund = +env("AUTO_FUND", "0");
+    if (autoFund > 0 && round % autoFund === 0) {
+      const n = await fundAgents(cfg, { board: false, log: () => {} }).catch((e) => (log("auto-fund failed", { error: String(e).slice(0, 200) }), 0));
+      if (n) log("auto-fund", { deposits: n });
     }
     for (const a of agents.values()) {
       a.unmatchedRounds++;
