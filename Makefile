@@ -95,7 +95,7 @@ kill-tests: build
 	for k in scripts/k*.ts; do echo "== $$k"; $(TSX) $$k || exit 1; done
 
 colo-check: build
-	pnpm --filter @nomad/colo exec colo check --account $${MATCHER_ID:-intents-matcher.nomadswarm.testnet} --target $${VERIFIER_ID:-intents.nomadswarm.testnet} --network testnet
+	node packages/colo/dist/cli.js check --account $${MATCHER_ID:-intents-matcher.nomadswarm.testnet} --target $${VERIFIER_ID:-intents.nomadswarm.testnet} --network testnet
 
 clean:
 	rm -rf out/*.svg out/*.json packages/*/dist apps/*/dist
