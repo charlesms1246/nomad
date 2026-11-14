@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NomadState } from "@/lib/types";
 import { DEMO_MS, demoFrame, failedPairs, pickDemoRing } from "@/lib/demo";
@@ -201,6 +202,13 @@ export default function Dashboard() {
             </span>
           )}
           {err && <span className="text-[#e66767]">poll error: {err}</span>}
+          <Link
+            href="/v2"
+            className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-[#f0efec] hover:border-white/40"
+            title="Open rings contract: any wallet standard, closed by anyone"
+          >
+            v2 rings (on chain) →
+          </Link>
           <button
             onClick={() => (demo ? setDemo(null) : startDemo())}
             className="rounded-full bg-[#f0efec] px-3.5 py-1.5 text-xs font-semibold text-[#0d0d0d] hover:bg-white"
