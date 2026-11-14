@@ -103,7 +103,8 @@ Output below was captured from this repo on 2026-11-14.
 | 3 | `make mainnet-proof` | `ring (3 agents), leg 1 first: insufficient balance or overflow` (and the same for legs 2 and 3), then `control: corrupted signature: invalid signature` and `control: zero salt: invalid salt`. This is read-only `simulate_intents` on **mainnet `intents.near`** |
 | 4 | `make test` | Each TypeScript package reports `Tests N passed`. Then the board's Rust tests report `test result: ok`. The v2 contracts test separately: `cd contracts/rings && cargo test` (16 passed) and `cd contracts/mandate && cargo test` (14 passed) |
 | 5 | `cd web && npm install && npm run dev` | The UI at http://localhost:3000. With no reachable `MATCHER_URL`, it shows a recorded real testnet state (a 3-way race capture, with real tx links) labelled **Recorded testnet data · 2026-11-13 23:53 UTC**. `make sim-serve` plus `make ui` shows a running simulation, labelled **Simulation**. `MATCHER_URL=http://localhost:1 make ui-check` prints `ui-check: source=recorded agents=12 rings=18 settled=6` |
-| 6 | Testnet proof | The tx links under [Deployments](#deployments) |
+| 6 | `cd web && npm run dev`, then open http://localhost:3000/v2?verify=1 | The v2 rings, read from `rings.nomadswarm.testnet` straight from testnet RPC in the browser. Each ring shows its legs' wallet standards and a "closed by a stranger" badge, and there's a reputation table. With `?verify=1`, each closed ring is re-checked on chain on load and shows, for example, `Verified on chain: k4 (not one of the agents) called close_ring in block 277,670,820. The contract's execute_intents ran in block 277,670,822 (2 blocks later, one cross-contract hop), status SuccessValue, settling 3 legs in 3 wallet standards.` We checked all 4 closed rings this way in a headless browser on 2026-11-14. Hosted: `<UI URL>/v2?verify=1` once deployed |
+| 7 | Testnet proof | The tx links under [Deployments](#deployments) |
 
 What `make mainnet-proof` shows, and no more:
 - It signs a 3-agent ring for mainnet `intents.near` with our signer. It runs the ring three times, rotated so that each leg is checked first once, because the Verifier checks payloads in order.
@@ -142,6 +143,7 @@ What `make mainnet-proof` shows, and no more:
 | LLM mode (NEAR AI Cloud sets an agent's margin; `legCheck` still decides every signature) | [apps/agent/src/llm.ts](apps/agent/src/llm.ts) | [llm.test.ts](apps/agent/test/llm.test.ts) against a mocked API, including clamping to [0, 5%]. Not run against the live API: it needs `LLM=1 NEARAI_API_KEY=…`, and we had no key |
 | Signed fixtures for `make dry-run` | [fixtures/rings](fixtures/rings), signed by `make fixtures` | Signed by dedicated agents `fx01`–`fx12` (`make fixture-accounts`), so live trading never drains them |
 | (Research appendix) House of Stake spend budgets | [scripts/hos-budget.ts](scripts/hos-budget.ts), [contracts/hos/build.sh](contracts/hos/build.sh) | [docs/HOS_BUDGETS.md](docs/HOS_BUDGETS.md), [hos-budget.json](docs/measurements/hos-budget.json); limits in [docs/research/HOS_LIMITS.md](docs/research/HOS_LIMITS.md) |
+| UI `/v2`: reads the rings contract from testnet RPC in the browser; wallet badge per leg, stranger-closer badge, reputation table, "Re-check the close on chain" (follows `close_ring` → `execute_intents` and compares every signed leg with the executed `token_diff` and the tips paid) | [web/app/v2](web/app/v2), [web/components/V2Rings.tsx](web/components/V2Rings.tsx) | `/v2?verify=1` re-checks every closed ring on load |
 | UI: ring graph, rings table, swarm and race panels | [web/components](web/components), API shape in [web/lib/types.ts](web/lib/types.ts) | `cd web && npx next build`; `make ui-check` (sim matcher + local dev UI + headless screenshot to `out/ui-check/ui.png`) |
 | Matcher container (read-only public API) | [apps/matcher/Dockerfile](apps/matcher/Dockerfile), [apps/matcher/src/server.ts](apps/matcher/src/server.ts) | [docs/DEPLOY.md](docs/DEPLOY.md): with `PUBLIC=1`, only `GET /api/state` and `/healthz` are served |
 
@@ -193,12 +195,13 @@ All of these are in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md), with tx hashes
 - **Differential test:** 500/500 random batches agree between `packages/verifier-model` and testnet `simulate_intents` (seed 1 with N = 200, seed 7 with N = 300).
 - **Attacks on chain:** all 10 rows pass. Each attack fails with the expected Verifier error and moves no balance.
 - **One-of-N commitments:** in the 3-way race, all 54 losing batches failed with `nonce was already used` ([race3.json](docs/measurements/race3.json)).
+- **Latency of contract closing:** the contract's `execute_intents` runs 2 blocks after the `close_ring` tx (one cross-contract hop), on every closed ring shown by `/v2?verify=1`.
 - **v2, a stranger closes a ring** (K-b, [rings-e2e.json](docs/measurements/rings-e2e.json)):
   - `intents-matcher-1` proposed a 3-agent ring (a01 ZEC → a02 USDC → a03 wNEAR → a01) on `rings.nomadswarm.testnet`, and each agent attached its signed leg.
   - `k4.nomadswarm.testnet`, which had no part in the ring, called `close_ring` [`85Emngj6…`](https://testnet.nearblocks.io/txns/85Emngj6B4q8EqSjAWShfPbMYSfrGstE9RnYJwrhVQdc). One cross-contract `execute_intents` settled the ring.
   - The closer received exactly the three tips (0.1% of each give).
   - Reputation counters were updated.
-- **v2, three wallet standards in one ring** ([rings-multiwallet.json](docs/measurements/rings-multiwallet.json)):
+- **v2, three wallet standards in one ring, through the contract** (ring `f5d3e16f…`, [scripts/rings-multiwallet.ts](scripts/rings-multiwallet.ts), [rings-multiwallet.json](docs/measurements/rings-multiwallet.json)):
   - `a01` (`nep413`), a fresh Ethereum key (`erc191`, implicit `0x…` account) and a fresh ed25519 key (`raw_ed25519`, implicit hex account) attached legs to one ring.
   - `k4` closed it [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR).
   - Each wallet gave 1,000,000 + a 1,000 tip and received 999,999. The closer received the three tips.
