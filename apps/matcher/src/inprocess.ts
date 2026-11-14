@@ -7,7 +7,7 @@ export class InProcessLink implements AgentLink {
   async propose(agent: string, p: RingProposal): Promise<{ signed?: MultiPayload; reason?: string }> {
     const a = this.agents.get(agent);
     if (!a) return { reason: "unknown agent" };
-    const ans = a.onProposal(p, this.now());
+    const ans = await a.onProposalAsync(p, this.now);
     return ans.type === "SIGNED" ? { signed: ans.signed } : { reason: ans.reason };
   }
   settled(agent: string, ringId: string, _tx: string | null, leg: { offerId: string; giveAmt: bigint }) {

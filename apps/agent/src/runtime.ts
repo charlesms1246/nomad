@@ -29,6 +29,12 @@ export interface AgentConfig {
   sizeFrac?: number;
   ttlMs?: number;
   verifierId: string;
+  /**
+   * Fee auction window (ms). With a window, competing proposals for the same offer that arrive within
+   * it are compared and only the one paying this agent the best rate is signed; the rest are declined
+   * ("outbid"). Matchers therefore compete on their surplus share. 0 = answer each proposal at once.
+   */
+  auctionMs?: number;
   /** Limit-price override hook (LLM=1 stretch): returns a margin given context. Never signs. */
   marginAdvisor?: (ctx: { holdings: Record<TokenId, bigint>; tokens: TokenInfo[] }) => Promise<number>;
 }
@@ -41,7 +47,7 @@ export class AgentRuntime {
   offers: Offer[] = [];
   balances: Record<TokenId, bigint> = {};
   /** ringId -> what this agent promised in that ring (released on SETTLED/FAILED/expiry). */
-  pending = new Map<string, { token: TokenId; amt: bigint; expiresAtMs: number; offerId: string }>();
+  pending = new Map<string, { token: TokenId; amt: bigint; expiresAtMs: number; offerId: string; getAmt: bigint }>();
   unmatchedRounds = 0;
   private seq = 0;
   /**
@@ -115,6 +121,15 @@ export class AgentRuntime {
     });
     if (!r.ok) return { type: "DECLINE", ringId: p.ringId, agent: this.id, reason: r.reason };
     const offer = this.offers.find((o) => o.id === r.leg.offerId)!;
+    // Fee competition between matchers: every leg for this offer shares one nonce, so at most one can
+    // execute. Never sign a proposal that pays this agent a strictly worse rate than one already signed
+    // for the same offer; equal or better ones are signed (whichever executes first wins, the rest fail).
+    for (const q of this.pending.values()) {
+      if (q.offerId !== offer.id || q.expiresAtMs < nowMs) continue;
+      // compare getAmt/giveAmt; equal terms are still signed (the shared nonce keeps them exclusive)
+      if (r.leg.getAmt * q.amt < q.getAmt * r.leg.giveAmt)
+        return { type: "DECLINE", ringId: p.ringId, agent: this.id, reason: "better proposal already signed" };
+    }
     const nk = `${offer.id}|${p.salt}`;
     let nonce = this.offerNonce.get(nk);
     if (!nonce) {
@@ -129,8 +144,47 @@ export class AgentRuntime {
       memo: `nomad:${p.ringId.slice(0, 16)}`,
       nonce,
     });
-    this.pending.set(p.ringId, { token: r.leg.give, amt: r.leg.giveAmt, expiresAtMs: Date.parse(p.deadline), offerId: offer.id });
+    this.pending.set(p.ringId, { token: r.leg.give, amt: r.leg.giveAmt, expiresAtMs: Date.parse(p.deadline), offerId: offer.id, getAmt: r.leg.getAmt });
     return { type: "SIGNED", ringId: p.ringId, agent: this.id, signed };
+  }
+
+  private auctions = new Map<string, { entries: { p: RingProposal; resolve: (a: ProposalAnswer) => void }[]; timer: ReturnType<typeof setTimeout> }>();
+
+  /**
+   * Answer a proposal, running the fee auction when cfg.auctionMs > 0: proposals for the same offer
+   * that arrive within the window are ranked by the rate they pay this agent; only the best is signed.
+   */
+  onProposalAsync(p: RingProposal, now: () => number): Promise<ProposalAnswer> {
+    const win = this.cfg.auctionMs ?? 0;
+    const mine = p.legs.find((l) => l.agent === this.id);
+    if (win <= 0 || !mine) return Promise.resolve(this.onProposal(p, now()));
+    return new Promise((resolve) => {
+      const key = mine.offerId;
+      let a = this.auctions.get(key);
+      if (!a) {
+        a = {
+          entries: [],
+          timer: setTimeout(() => {
+            this.auctions.delete(key);
+            const rate = (q: RingProposal) => {
+              const l = q.legs.find((x) => x.agent === this.id)!;
+              return { get: l.getAmt, give: l.giveAmt };
+            };
+            // best = highest getAmt/giveAmt (ties: earliest)
+            const sorted = [...a!.entries].sort((x, y) => {
+              const rx = rate(x.p), ry = rate(y.p);
+              const lhs = ry.get * rx.give, rhs = rx.get * ry.give;
+              return lhs > rhs ? 1 : lhs < rhs ? -1 : 0;
+            });
+            const [best, ...rest] = sorted;
+            best!.resolve(this.onProposal(best!.p, now()));
+            for (const r of rest) r.resolve({ type: "DECLINE", ringId: r.p.ringId, agent: this.id, reason: "outbid by a cheaper matcher" });
+          }, win),
+        };
+        this.auctions.set(key, a);
+      }
+      a.entries.push({ p, resolve });
+    });
   }
 
   onSettled(ringId: string, offerId?: string, gave?: bigint) {
