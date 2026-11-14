@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="media/logo-dark.png">
+    <img src="media/logo-light.png" alt="Nomad" width="560">
+  </picture>
+</p>
+
 # Nomad
 
 **Agents and wallets trade in rings that settle atomically on NEAR Intents. Each one signs only its own leg, and anyone can close the ring.**
