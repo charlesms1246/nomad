@@ -1,11 +1,11 @@
-//! ERC-7683 order ingress: an EVM wallet signs a standard `GaslessCrossChainOrder` (EIP-712) whose
+//! ERC-7683 order ingress: an EVM wallet signs an ERC-7683 (earlier draft) `GaslessCrossChainOrder` (EIP-712) whose
 //! `orderData` is a Nomad leg. The contract recomputes the EIP-712 digest on chain, recovers the
 //! signer with `ecrecover`, and records the order as a standing limit for that 0x address. A ring
 //! that includes a leg for this address must then respect the order (tokens, max give, min price).
 //!
 //! Constants (shared with packages/intents/src/erc7683.ts and its golden vector):
 //!   domain  = EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)
-//!             {name: "Nomad", version: "1", chainId: 397, verifyingContract: 0x0}
+//!             {name: "Nomad", version: "1", chainId: <contract setting: 398 NEAR testnet, 397 mainnet>, verifyingContract: 0x0}
 //!   order   = GaslessCrossChainOrder(address originSettler,address user,uint256 nonce,
 //!             uint256 originChainId,uint32 openDeadline,uint32 fillDeadline,bytes32 orderDataType,bytes orderData)
 //!   orderDataType = keccak256("NomadLeg(string give,uint256 giveAmount,string want,uint256 minWantAmount)")
@@ -15,7 +15,6 @@ use near_sdk::env;
 use near_sdk::json_types::U128;
 use near_sdk::near;
 
-pub const CHAIN_ID: u64 = 397;
 pub const DOMAIN_NAME: &str = "Nomad";
 pub const DOMAIN_VERSION: &str = "1";
 const DOMAIN_TYPE: &str = "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)";
@@ -27,7 +26,8 @@ const LEG_TYPE: &str = "NomadLeg(string give,uint256 giveAmount,string want,uint
 #[derive(Clone, Debug, PartialEq)]
 pub struct OrderInput {
     pub user: String,
-    pub nonce: U128,
+    /// uint256 as a decimal string (e.g. a 32-byte Verifier nonce read big-endian)
+    pub nonce: String,
     pub open_deadline: u32,
     pub fill_deadline: u32,
     pub give: String,
@@ -48,6 +48,26 @@ pub struct Order {
 
 pub fn keccak(b: &[u8]) -> [u8; 32] {
     env::keccak256_array(b)
+}
+
+/// Decimal string -> 32-byte big-endian uint256.
+pub fn word_dec(s: &str) -> Result<[u8; 32], String> {
+    if s.is_empty() || s.len() > 78 || !s.bytes().all(|c| c.is_ascii_digit()) {
+        return Err(format!("not a uint256: {s}"));
+    }
+    let mut w = [0u8; 32];
+    for c in s.bytes() {
+        let mut carry = (c - b'0') as u32;
+        for b in w.iter_mut().rev() {
+            let v = (*b as u32) * 10 + carry;
+            *b = (v & 0xff) as u8;
+            carry = v >> 8;
+        }
+        if carry != 0 {
+            return Err("uint256 overflow".into());
+        }
+    }
+    Ok(w)
 }
 
 fn word_u128(x: u128) -> [u8; 32] {
@@ -97,32 +117,32 @@ pub fn encode_leg(give: &str, give_amount: u128, want: &str, min_want: u128) -> 
     out
 }
 
-pub fn domain_separator() -> [u8; 32] {
+pub fn domain_separator(chain_id: u64) -> [u8; 32] {
     let mut enc = Vec::new();
     enc.extend(keccak(DOMAIN_TYPE.as_bytes()));
     enc.extend(keccak(DOMAIN_NAME.as_bytes()));
     enc.extend(keccak(DOMAIN_VERSION.as_bytes()));
-    enc.extend(word_u128(CHAIN_ID as u128));
+    enc.extend(word_u128(chain_id as u128));
     enc.extend([0u8; 32]); // verifyingContract = 0x0
     keccak(&enc)
 }
 
-pub fn order_digest(o: &OrderInput) -> Result<[u8; 32], String> {
+pub fn order_digest(o: &OrderInput, chain_id: u64) -> Result<[u8; 32], String> {
     let user = parse_address(&o.user)?;
     let order_data = encode_leg(&o.give, o.give_amount.0, &o.want, o.min_want_amount.0);
     let mut enc = Vec::new();
     enc.extend(keccak(ORDER_TYPE.as_bytes()));
     enc.extend(word_addr(&[0u8; 20])); // originSettler
     enc.extend(word_addr(&user));
-    enc.extend(word_u128(o.nonce.0));
-    enc.extend(word_u128(CHAIN_ID as u128)); // originChainId
+    enc.extend(word_dec(&o.nonce)?);
+    enc.extend(word_u128(chain_id as u128)); // originChainId
     enc.extend(word_u128(o.open_deadline as u128));
     enc.extend(word_u128(o.fill_deadline as u128));
     enc.extend(keccak(LEG_TYPE.as_bytes())); // orderDataType
     enc.extend(keccak(&order_data));
     let hash_struct = keccak(&enc);
     let mut msg = vec![0x19, 0x01];
-    msg.extend(domain_separator());
+    msg.extend(domain_separator(chain_id));
     msg.extend(hash_struct);
     Ok(keccak(&msg))
 }

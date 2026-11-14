@@ -116,6 +116,8 @@ pub struct Rings {
     /// ERC-7683 orders (id -> order) and the live order for (user|give|want).
     orders: LookupMap<String, Order>,
     order_by_key: LookupMap<String, String>,
+    /// EIP-155 chain id in the EIP-712 domain: 398 NEAR testnet, 397 NEAR mainnet.
+    chain_id: u64,
 }
 
 /// State layout before ERC-7683 orders were added (for `migrate`).
@@ -265,6 +267,7 @@ impl Rings {
             total_settled: 0,
             orders: LookupMap::new(Key::Orders),
             order_by_key: LookupMap::new(Key::OrderByKey),
+            chain_id: 398,
         }
     }
 
@@ -283,6 +286,7 @@ impl Rings {
             total_settled: old.total_settled,
             orders: LookupMap::new(Key::Orders),
             order_by_key: LookupMap::new(Key::OrderByKey),
+            chain_id: 398,
         }
     }
 
@@ -295,7 +299,7 @@ impl Rings {
         require!((order.open_deadline as u64) >= now_s, "order's openDeadline has passed");
         require!((order.fill_deadline as u64) > now_s, "order's fillDeadline has passed");
         require!(order.give != order.want && order.give_amount.0 > 0 && order.min_want_amount.0 > 0, "bad order terms");
-        let digest = order::order_digest(&order).unwrap_or_else(|e| env::panic_str(&e));
+        let digest = order::order_digest(&order, self.chain_id).unwrap_or_else(|e| env::panic_str(&e));
         let signer = order::recover(&digest, &signature).unwrap_or_else(|e| env::panic_str(&e));
         require!(signer.eq_ignore_ascii_case(&order.user), format!("signed by {signer}, order is for {}", order.user));
         let digest_hex: String = digest.iter().map(|x| format!("{x:02x}")).collect();
@@ -468,10 +472,15 @@ impl Rings {
         self.rep.get(&agent).unwrap_or_default()
     }
     pub fn config(&self) -> Value {
-        json!({ "owner": self.owner, "verifier": self.verifier, "fee_pips": self.fee_pips, "rings": self.ring_ids.len(), "settled": self.total_settled })
+        json!({ "owner": self.owner, "verifier": self.verifier, "fee_pips": self.fee_pips, "rings": self.ring_ids.len(), "settled": self.total_settled, "eip712_chain_id": self.chain_id })
     }
     pub fn check_ring_view(&self, legs: Vec<LegSpec>) -> Option<String> {
         check_ring(&legs, self.fee_pips).err()
+    }
+
+    pub fn set_chain_id(&mut self, chain_id: u64) {
+        require!(env::predecessor_account_id() == self.owner, "owner only");
+        self.chain_id = chain_id;
     }
 
     pub fn set_fee_pips(&mut self, fee_pips: u32) {

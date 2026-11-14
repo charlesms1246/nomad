@@ -190,3 +190,68 @@ fn a_near_account_cannot_be_registered_by_someone_else() {
     ctx(2, 0);
     c.register_agent("a01.nomadswarm.testnet".into(), "x".into());
 }
+
+// ---- ERC-7683 (earlier draft) GaslessCrossChainOrder: golden vector shared with packages/intents ----
+const VECTOR: &str = include_str!("../../../packages/intents/test/fixtures/erc7683-vector.json");
+
+fn vector_order() -> (order::OrderInput, String, String) {
+    let v: Value = serde_json::from_str(VECTOR).unwrap();
+    let o = &v["order"];
+    let leg = &v["leg"];
+    let input = order::OrderInput {
+        user: o["user"].as_str().unwrap().into(),
+        nonce: o["nonce"].as_str().unwrap().into(),
+        open_deadline: o["openDeadline"].as_u64().unwrap() as u32,
+        fill_deadline: o["fillDeadline"].as_u64().unwrap() as u32,
+        give: leg["give"].as_str().unwrap().into(),
+        give_amount: U128(leg["giveAmount"].as_str().unwrap().parse().unwrap()),
+        want: leg["want"].as_str().unwrap().into(),
+        min_want_amount: U128(leg["minWantAmount"].as_str().unwrap().parse().unwrap()),
+    };
+    (input, v["digest"].as_str().unwrap().into(), v["signature"]["rsv"].as_str().unwrap().into())
+}
+
+#[test]
+fn erc7683_order_data_and_digest_match_the_ts_vector() {
+    ctx(0, 0);
+    let v: Value = serde_json::from_str(VECTOR).unwrap();
+    let (o, digest, _) = vector_order();
+    let od = order::encode_leg(&o.give, o.give_amount.0, &o.want, o.min_want_amount.0);
+    let od_hex = format!("0x{}", od.iter().map(|x| format!("{x:02x}")).collect::<String>());
+    assert_eq!(od_hex, v["order"]["orderData"].as_str().unwrap());
+    let d = order::order_digest(&o, 398).unwrap();
+    assert_eq!(format!("0x{}", d.iter().map(|x| format!("{x:02x}")).collect::<String>()), digest);
+}
+
+#[test]
+fn erc7683_ecrecover_finds_the_signer() {
+    ctx(0, 0);
+    let (o, _, sig) = vector_order();
+    let d = order::order_digest(&o, 398).unwrap();
+    assert_eq!(order::recover(&d, &sig).unwrap(), o.user);
+    // tampered order -> different signer
+    let mut t = o.clone();
+    t.give_amount = U128(t.give_amount.0 + 1);
+    let d2 = order::order_digest(&t, 398).unwrap();
+    assert_ne!(order::recover(&d2, &sig).unwrap(), o.user);
+    // mainnet domain -> different signer
+    let d3 = order::order_digest(&o, 397).unwrap();
+    assert_ne!(order::recover(&d3, &sig).unwrap(), o.user);
+}
+
+#[test]
+fn submit_order_then_a_ring_below_the_order_price_is_rejected() {
+    let mut c = contract();
+    let (o, _, sig) = vector_order();
+    // block time before the order's openDeadline
+    let mut b = VMContextBuilder::new();
+    b.current_account_id("rings.nomadswarm.testnet".parse().unwrap())
+        .predecessor_account_id(accounts(2))
+        .attached_deposit(NearToken::from_yoctonear(10u128.pow(23)))
+        .block_timestamp((o.open_deadline as u64 - 60) * 1_000_000_000);
+    testing_env!(b.build());
+    let id = c.submit_order(o.clone(), sig);
+    let rec = c.get_order(id).unwrap();
+    assert_eq!(rec.input.user, o.user);
+    assert!(c.order_for(o.user.clone(), o.give.clone(), o.want.clone()).is_some());
+}
