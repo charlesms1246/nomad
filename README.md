@@ -63,7 +63,7 @@ Everything in that list, Nomad also does or now does. Fee competition between ma
 | 1Click floor / fallback | Real quote floors, and the fallback is taken | Quotes as the baseline; the fallback is refused on testnet by design |
 | Read-only mainnet `simulate_intents` proof | Yes | Yes (`make mainnet-proof`) |
 | Real-flow demand study | **Yes** (0.0% / 0.2% / 11.7% of volume within 5 min / 1 h / 1 day) | No |
-| Verifier on testnet | A copy with `intents.near`'s code hash, deployed by someone else, fee 0 | Our deployment with `intents.near`'s code hash, fee 1 pip, FullAccess key deleted |
+| Verifier on testnet | A copy with `intents.near`'s code hash, deployed by someone else, fee 0 | Our deployment with `intents.near`'s code hash, fee 1 pip, FullAccess key deleted. The v2 rings and mandate contracts have no access keys |
 
 Other prior work:
 - **CoW Protocol** ([coincidence of wants](https://docs.cow.fi/overview/coincidence-of-wants)). Ring trades are an established idea. Solvers there settle them through CoW's own contract.
@@ -266,7 +266,14 @@ Ring settlements:
 - The contract's own access control still names `nomadswarm.testnet` as super-admin, with the roles `Upgrader`, `RelayerKeysManager` and `SaltManager`. So the team can still upgrade the code, manage relayer keys and rotate salts through the contract.
 - This is the same model as mainnet, where the `intents.near` DAO holds those roles; here the holder is our team.
 
-**Who controls the v2 contracts.** `rings.nomadswarm.testnet` and `mandate.nomadswarm.testnet` still have FullAccess keys held by the team, so we can redeploy them. The team plans to delete these keys at the feature freeze. Even after that, the rings contract's owner (`nomadswarm.testnet`) can still change its fee setting and EIP-712 chain id (`set_fee_pips`, `set_chain_id`; currently 1 pip and 398). Proposing, attaching and closing need no permission. Tips pass through the contract's own Verifier balance on their way to the closer.
+**Who controls the v2 contracts.** As of the feature freeze on 2026-11-14:
+- `rings.nomadswarm.testnet` and `mandate.nomadswarm.testnet` have **no access keys** (`view_access_key_list` returns `[]`). The deletion txs are [`VrEaGZU6…`](https://testnet.nearblocks.io/txns/VrEaGZU6CqwDddidf4XSp2eLHDAX8WxsXSKxHRfxVo5) (rings) and [`BPuAZW6R…`](https://testnet.nearblocks.io/txns/BPuAZW6Rp7Q8tuzFe7b6dX5gejjGckPJZ5cbEwyuUccR) (mandate).
+- Neither contract has a function that deploys code or adds keys, so **the code is fixed**. The code hashes are `FWgwBLpsVax1iRF3jC6QcM3XJEiJXjDCR3oCRFr1uHLc` (rings) and `7ufPqdBa1NYbhkbPHQ8Ub9FY9AzRpTsF2UTt5F1sYNTT` (mandate).
+- **What remains:**
+  - the rings owner (`nomadswarm.testnet`) can still change the fee setting and the EIP-712 chain id (`set_fee_pips`, `set_chain_id`; currently 1 pip and 398);
+  - each mandate's owner manages its own mandate's limits.
+- Proposing, attaching and closing need no permission. Tips pass through the contract's own Verifier balance on their way to the closer.
+- Caveat: both wasm files are non-reproducible `cargo near` builds, so rebuilding from source may not match these hashes byte for byte. Details: [MEASUREMENTS](docs/MEASUREMENTS.md) "Contract locks at the feature freeze" and [contract-locks.json](docs/measurements/contract-locks.json).
 
 ## Threat model and known limits
 
@@ -274,7 +281,7 @@ See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md). In short:
 - the matcher can take only what is left after every agent's signed amount (A2);
 - a ring with an unfunded or altered leg fails as a whole (A1, A3);
 - a leaked agent key loses that agent's inventory;
-- the team controls the testnet Verifier through its admin roles, and the v2 contracts through FullAccess keys (see Deployments).
+- the team controls the testnet Verifier through its admin roles. The v2 contracts have no access keys and fixed code, but the rings owner's fee and chain-id setters remain (see Deployments).
 
 Only assets held inside the Verifier can be in a ring.
 
