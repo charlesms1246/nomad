@@ -19,11 +19,11 @@ export interface Station {
 }
 
 export const STATIONS: Station[] = [
-  { id: "board", meshId: "dispatch", label: "Offer board", subLabel: "board.nomadswarm.testnet", position: [-8, -6] },
-  { id: "rings", meshId: "compute", label: "Rings contract", subLabel: "propose and attach", position: [8, -6] },
-  { id: "verifier", meshId: "vault", label: "Verifier", subLabel: "execute_intents", position: [0, -9] },
-  { id: "mandate", meshId: "shrine", label: "Mandate", subLabel: "Chain Signatures", position: [-8, 6] },
-  { id: "reputation", meshId: "storage", label: "Reputation", subLabel: "kept by the rings contract", position: [8, 6] },
+  { id: "board", meshId: "dispatch", label: "Offer board", subLabel: "board.nomadswarm.testnet", position: [-7, -5] },
+  { id: "rings", meshId: "compute", label: "Rings contract", subLabel: "propose and attach", position: [7, -5] },
+  { id: "verifier", meshId: "vault", label: "Verifier", subLabel: "execute_intents", position: [0, -7.5] },
+  { id: "mandate", meshId: "shrine", label: "Mandate", subLabel: "Chain Signatures", position: [-7, 4.5] },
+  { id: "reputation", meshId: "storage", label: "Reputation", subLabel: "on the rings contract", position: [7, 4.5] },
 ]
 
 const stationPos = (id: StationId) => STATIONS.find((s) => s.id === id)!.position
@@ -123,21 +123,21 @@ export function buildBots(state: NomadState | null, plays: Play[]): BotDef[] {
   const bots: BotDef[] = []
   let extra = 0
   const color = (a: string) => NAMED[shortName(a)] ?? EXTRA[extra++ % EXTRA.length]
-  const n = agents.length
-  const radius = Math.max(4.2, (n * 1.7) / (2 * Math.PI))
-  agents.forEach((a, i) => {
-    const ang = -Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2
-    bots.push({ id: a, name: shortName(a), kind: "agent", color: color(a), home: [Math.cos(ang) * radius, Math.sin(ang) * radius * 0.8 + 0.4] })
-  })
-  closers.forEach((a, i) => {
-    const x = (i - (closers.length - 1) / 2) * 1.5
-    bots.push({ id: a, name: shortName(a), kind: "closer", color: color(a), home: [x, 0.4] })
+  // Idle bots wait in neat rows between the front stations, away from the docks.
+  const all = [...agents.map((a) => [a, "agent"] as const), ...closers.map((a) => [a, "closer"] as const)]
+  const perRow = Math.max(6, Math.ceil(all.length / 2))
+  const gap = Math.min(1.15, 8.6 / Math.max(1, perRow - 1))
+  all.forEach(([a, kind], i) => {
+    const row = Math.floor(i / perRow)
+    const inRow = Math.min(perRow, all.length - row * perRow)
+    const x = (i % perRow - (inRow - 1) / 2) * gap + (row % 2 ? gap / 2 : 0)
+    bots.push({ id: a, name: shortName(a), kind, color: color(a), home: [x, 1.6 + row * 1.5] })
   })
   return bots
 }
 
-const DOCK_DISTANCE = 2.4
-const SLOT = 1.5
+const DOCK_DISTANCE = 2.3
+const SLOT = 1.55
 
 function dock(station: StationId, slot: number, count: number): [number, number] {
   // Queue in a row along x on the camera side of the station, so every bot in it stays readable.

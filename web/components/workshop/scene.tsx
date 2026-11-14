@@ -18,8 +18,11 @@ export interface RingWorkshopProps {
 /** "overview", "follow" (whoever is acting in the current ring), or a pinned bot id. */
 type CameraMode = "overview" | "follow" | string
 
-const OVERVIEW_POS = new Vector3(12, 30, 30)
-const OVERVIEW_LOOK = new Vector3(0, 0, -1)
+// Landscape: the five stations fill the frame. Portrait (phones): higher and more top-down, pulled back to fit the width.
+const OVERVIEW_POS = new Vector3(9, 23.5, 23)
+const OVERVIEW_LOOK = new Vector3(0, 0, -1.4)
+const PORTRAIT_POS = new Vector3(0, 27, 7)
+const PORTRAIT_LOOK = new Vector3(0, 0, -0.6)
 // Chase-cam offset from the bot's position (above + diagonal behind).
 const FOLLOW_OFFSET = new Vector3(6, 9, 9)
 // POS_RATE < LOOK_RATE: the camera glides into place slightly slower than it turns to track.
@@ -35,7 +38,7 @@ function CameraRig({
   director: Director
   botRefs: React.MutableRefObject<Record<string, Group | null>>
 }) {
-  const { camera } = useThree()
+  const { camera, size } = useThree()
   const desiredPos = useRef(new Vector3())
   const desiredLook = useRef(new Vector3())
   const smoothedLook = useRef(OVERVIEW_LOOK.clone())
@@ -44,8 +47,14 @@ function CameraRig({
     const id = mode === "overview" ? null : mode === "follow" ? director.now.focus : mode
     const g = id ? botRefs.current[id] : null
     if (!g) {
-      desiredPos.current.copy(OVERVIEW_POS)
-      desiredLook.current.copy(OVERVIEW_LOOK)
+      const aspect = size.width / Math.max(1, size.height)
+      const portrait = aspect < 1
+      const pos = portrait ? PORTRAIT_POS : OVERVIEW_POS
+      const look = portrait ? PORTRAIT_LOOK : OVERVIEW_LOOK
+      // Narrower than the reference aspect sees less across: pull back along the same line to keep every station in.
+      const pull = Math.max(1, (portrait ? 1.7 : 1.6) / Math.max(0.3, aspect))
+      desiredPos.current.copy(pos).sub(look).multiplyScalar(pull).add(look)
+      desiredLook.current.copy(look)
     } else {
       const bp = g.position
       // Fixed heights so the bot's hop doesn't shake the camera.
@@ -82,15 +91,15 @@ export function RingWorkshopScene({ state, height = 520 }: RingWorkshopProps) {
   const [labels] = useState<LabelStore>(newLabelStore)
 
   // The DOM overlay (tasks, phase line) refreshes a few times a second; positions update every frame.
-  const [overlay, setOverlay] = useState<{ now: DirectorNow; tasks: Record<string, string | null> }>({
+  const [overlay, setOverlay] = useState<{ now: DirectorNow; members: Record<string, boolean> }>({
     now: director.now,
-    tasks: {},
+    members: {},
   })
   useEffect(() => {
     const id = setInterval(() => {
-      const tasks: Record<string, string | null> = {}
-      for (const b of bots) tasks[b.id] = director.peek(b.id)?.task ?? null
-      setOverlay({ now: director.now, tasks })
+      const members: Record<string, boolean> = {}
+      for (const b of bots) members[b.id] = !!director.peek(b.id)?.inRing
+      setOverlay({ now: director.now, members })
     }, 200)
     return () => clearInterval(id)
   }, [director, bots])
@@ -105,7 +114,7 @@ export function RingWorkshopScene({ state, height = 520 }: RingWorkshopProps) {
       <div style={{ height }} className="relative w-full">
         <Canvas
           dpr={[1, 2]}
-          camera={{ position: [12, 30, 30], fov: 26, near: 0.1, far: 1000 }}
+          camera={{ position: [9, 23.5, 23], fov: 26, near: 0.1, far: 1000 }}
           onCreated={({ camera }) => camera.lookAt(OVERVIEW_LOOK)}
           onPointerMissed={() => setCameraMode((m) => (m === "overview" || m === "follow" ? m : "overview"))}
         >
@@ -142,37 +151,39 @@ export function RingWorkshopScene({ state, height = 520 }: RingWorkshopProps) {
         {/* Labels, positioned every frame by LabelProjector */}
         <div className="pointer-events-none absolute inset-0 select-none">
           {STATIONS.map((s) => (
-            <div key={s.id} data-align="bottom" ref={labelEl(labels, `station:${s.id}`)} className="absolute left-0 top-0 flex flex-col items-center gap-0.5 whitespace-nowrap" style={{ transform: "translate(-9999px,-9999px)" }}>
+            <div key={s.id} data-align="bottom" ref={labelEl(labels, `station:${s.id}`)} className="absolute left-0 top-0 flex flex-col items-center gap-1 whitespace-nowrap" style={{ transform: "translate(-9999px,-9999px)" }}>
               <span className="rounded-sm border border-white/15 bg-black/75 px-2 py-0.5 text-[11px] font-medium text-white">{s.label}</span>
-              <span className="text-[10px] text-white/55">{s.subLabel}</span>
+              <span className="rounded-sm bg-black/55 px-1.5 text-[10px] leading-4 text-white/65">{s.subLabel}</span>
             </div>
           ))}
+          {/* Names only for the bots in the current ring; the bottom line says what is happening */}
           {bots.map((b) => (
-            <BotLabel key={b.id} def={b} store={labels} task={overlay.tasks[b.id] ?? null} />
+            <BotLabel key={b.id} def={b} store={labels} shown={!!overlay.members[b.id]} />
           ))}
         </div>
 
-        {/* Camera modes */}
-        <div className="absolute right-3 top-3 z-10 flex gap-1 rounded-md border border-white/10 bg-black/60 p-1 backdrop-blur-sm">
-          {(["overview", "follow"] as const).map((m) => {
-            const active = m === "overview" ? cameraMode === "overview" : cameraMode !== "overview"
-            return (
-              <button
-                key={m}
-                onClick={() => setCameraMode(m)}
-                className={`rounded px-2.5 py-1 text-xs transition-colors ${
-                  active ? "bg-[#3987e5]/20 text-[#8dbcf3]" : "text-white/55 hover:text-white"
-                }`}
-              >
-                {m === "overview" ? "Overview" : "Follow"}
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="pointer-events-none absolute left-3 top-3 text-xs text-white/60">
-          {live ? "Live from the matcher on NEAR testnet" : "Replaying settled rings recorded on NEAR testnet"}
-          {followName && <span className="text-white/45"> · following {followName}</span>}
+        {/* Status line and camera modes share one row, so the line wraps instead of running under the buttons */}
+        <div className="pointer-events-none absolute left-3 right-3 top-3 z-10 flex items-start justify-between gap-3">
+          <div className="min-w-0 pt-1 text-xs leading-snug text-white/60">
+            {live ? "Live from the matcher on NEAR testnet" : "Replaying settled rings recorded on NEAR testnet"}
+            {followName && <span className="text-white/45"> · following {followName}</span>}
+          </div>
+          <div className="pointer-events-auto flex shrink-0 gap-1 rounded-md border border-white/10 bg-black/60 p-1 backdrop-blur-sm">
+            {(["overview", "follow"] as const).map((m) => {
+              const active = m === "overview" ? cameraMode === "overview" : cameraMode !== "overview"
+              return (
+                <button
+                  key={m}
+                  onClick={() => setCameraMode(m)}
+                  className={`rounded px-2.5 py-1 text-xs transition-colors ${
+                    active ? "bg-[#3987e5]/20 text-[#8dbcf3]" : "text-white/55 hover:text-white"
+                  }`}
+                >
+                  {m === "overview" ? "Overview" : "Follow"}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-4 text-sm">
@@ -188,14 +199,16 @@ export function RingWorkshopScene({ state, height = 520 }: RingWorkshopProps) {
   )
 }
 
-function BotLabel({ def, store, task }: { def: BotDef; store: LabelStore; task: string | null }) {
+function BotLabel({ def, store, shown }: { def: BotDef; store: LabelStore; shown: boolean }) {
   const color = useMemo(() => specFor(def.color).accent, [def.color])
   return (
-    <div ref={labelEl(store, `bot:${def.id}`)} className="absolute left-0 top-0 flex flex-col items-center gap-0.5 whitespace-nowrap" style={{ transform: "translate(-9999px,-9999px)" }}>
-      <span className="text-[11px] font-semibold" style={{ color }}>
+    <div ref={labelEl(store, `bot:${def.id}`)} className="absolute left-0 top-0 whitespace-nowrap" style={{ transform: "translate(-9999px,-9999px)" }}>
+      <span
+        className="rounded-sm bg-black/60 px-1 text-[11px] font-semibold transition-opacity duration-200"
+        style={{ color, opacity: shown ? 1 : 0 }}
+      >
         {def.name}
       </span>
-      {task && <span className="rounded-sm border border-white/10 bg-black/70 px-1.5 py-0.5 text-[10px] text-white/80">{task}</span>}
     </div>
   )
 }

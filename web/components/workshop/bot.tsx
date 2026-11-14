@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react"
 import { useFrame } from "@react-three/fiber"
-import { Color, Group, Mesh } from "three"
+import { Color, Group, Mesh, MeshLambertMaterial } from "three"
 import type { BotDef, Director } from "./director"
 import { useLabel } from "./labels"
 
@@ -44,6 +44,8 @@ const SETTLE_HOPS = 3
 const SETTLE_PERIOD = 0.42
 const SETTLE_HEIGHT = 0.75
 const SPEED = 7
+const SCALE = 1.3
+const IDLE_DIM = 0.32
 
 export function Bot({
   def,
@@ -60,6 +62,8 @@ export function Bot({
   const ringRef = useRef<Mesh>(null)
   const initializedRef = useRef(false)
   const walkingMixRef = useRef(0)
+  const bodyRef = useRef<Group>(null)
+  const dimRef = useRef(1)
   const spec = useMemo(() => specFor(def.color), [def.color])
   const anchor = useLabel(`bot:${def.id}`)
   const seed = useMemo(() => [...def.id].reduce((s, ch) => s + ch.charCodeAt(0), 0), [def.id])
@@ -113,6 +117,20 @@ export function Bot({
     g.position.y = y
 
     if (ringRef.current) ringRef.current.visible = s.inRing && s.task !== null
+
+    // Bots outside the current ring are dimmed; the ring's bots are at full colour.
+    const dimTarget = s.inRing ? 1 : IDLE_DIM
+    const dim = dimRef.current + (dimTarget - dimRef.current) * Math.min(1, delta * 5)
+    if (Math.abs(dim - dimRef.current) > 0.002 || !bodyRef.current?.userData.dimmed) {
+      dimRef.current = dim
+      bodyRef.current?.traverse((o) => {
+        const m = (o as Mesh).material as MeshLambertMaterial | undefined
+        if (!m || !("color" in m)) return
+        if (!o.userData.base) o.userData.base = m.color.clone()
+        m.color.copy(o.userData.base as Color).multiplyScalar(dim)
+      })
+      if (bodyRef.current) bodyRef.current.userData.dimmed = true
+    }
   })
 
   return (
@@ -132,16 +150,17 @@ export function Bot({
     >
       {/* Shadow blob */}
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[1.1, 0.8]} />
+        <planeGeometry args={[1.4, 1.0]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.35} />
       </mesh>
 
       {/* Activity ring */}
       <mesh ref={ringRef} visible={false} position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.55, 0.72, 24]} />
+        <ringGeometry args={[0.7, 0.9, 24]} />
         <meshBasicMaterial color={spec.accent} transparent opacity={0.85} />
       </mesh>
 
+      <group ref={bodyRef} scale={SCALE}>
       {/* Feet */}
       <mesh position={[-0.12, 0.05, 0]}>
         <boxGeometry args={[0.14, 0.1, 0.16]} />
@@ -226,8 +245,10 @@ export function Bot({
         <meshLambertMaterial color={spec.accent} />
       </mesh>
 
+      </group>
+
       {/* Nameplate anchor (label drawn in the DOM overlay) */}
-      <group ref={anchor} position={[0, -0.15, 0]} />
+      <group ref={anchor} position={[0, -0.2, 0]} />
     </group>
   )
 }

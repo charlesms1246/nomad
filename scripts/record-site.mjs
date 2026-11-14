@@ -1,6 +1,6 @@
 // Record the real Nomad site for the demo video, frame by frame at a steady 30 fps.
 //   node scripts/record-site.mjs <base url> <out dir> [segment ...]
-// Segments: hero, replay, v2. Each becomes <out dir>/web-<segment>.mp4 (1920x1080, 30 fps, no audio).
+// Segments: hero, replay, dashboard, v2. Each becomes <out dir>/web-<segment>.mp4 (1920x1080, 30 fps, no audio).
 // Pages render at 1440x810 CSS px with deviceScaleFactor 4/3, so the layout is the desktop one and the output is 1080p.
 // Timers, animation frames and WebGL run on Chrome's virtual time, advanced exactly 1/30 s per frame, so pacing
 // is steady no matter how slow a capture is. Anything that needs the network (the /v2 on-chain checks) is loaded
@@ -110,6 +110,40 @@ const SEGMENTS = {
     await advance(50);
     await record("replay", 23.6, null, [[0.3, "A real three-wallet ring, replayed from testnet."], [3.4, "Each wallet attaches its own signed leg."],
       [8.6, "k4, a stranger, closes it."], [12.2, "One execute_intents call settles all three legs."], [16.4, "The tips go to k4, and the contract records reputation."]]);
+  },
+  /* /dashboard: the ring workshop plays the recorded three-wallet ring (f5d3e16f, closed by k4) from its first step.
+     Overview while the offers are posted and the legs attached, then Follow (the camera picks up the closer, k4)
+     through close, execute_intents and the settle hop, then back to Overview. The workshop's clock is r3f's,
+     which runs on virtual time, so the ring's start is found by stepping the paused clock until its first caption shows. */
+  async dashboard() {
+    await send("Page.navigate", { url: "about:blank" }); await sleep(300);
+    await send("Page.navigate", { url: base + "/dashboard" });
+    for (let i = 0; i < 600; i++) { await sleep(10); if (await ev(`document.readyState === 'complete' && !!document.querySelector('canvas')`)) break; }
+    await send("Emulation.setVirtualTimePolicy", { policy: "pause" });
+    await sleep(1500);
+    await ev(`document.querySelectorAll('nextjs-portal').forEach(e => e.remove()); 1`);
+    /* step until the first ring of the loop (the three-wallet ring) shows its opening caption, caught on a transition, so
+       the capture starts on the ring's first step (to within one 100 ms step) */
+    const caption = `(() => { const c = document.querySelector('canvas'); let w = c; while (w && !(w.innerText || '').includes('Overview')) w = w.parentElement;
+      return w ? w.innerText : ''; })()`;
+    let prev = null, steps = 0;
+    for (; steps < 1200; steps++) {
+      await advance(100);
+      const txt = (await ev(caption)) || "";
+      if (prev !== null && /0x810d…f371, 0453…66c2 post offers on the board/.test(txt) && !/post offers on the board/.test(prev)) break;
+      prev = txt;
+    }
+    console.log(`dashboard: ring start found after ${(steps / 10).toFixed(1)} s of virtual time`);
+    const top = await ev(`(() => { const c = document.querySelector('canvas'); let w = c; while (w && !/rounded/.test(w.className || '')) w = w.parentElement;
+      return Math.max(0, (w || c).getBoundingClientRect().top + scrollY - 72); })()`);
+    await ev(`window.scrollTo(0, ${top}); 1`);
+    const click = (label) => ev(`(() => { const b = [...document.querySelectorAll('button')].find(e => e.innerText.trim() === '${label}'); b && b.click(); return !!b; })()`);
+    let followed = false, back = false;
+    await record("dashboard", 14, async (t) => {
+      if (!followed && t >= 5.0) { followed = true; await click("Follow"); }
+      if (!back && t >= 10.6) { back = true; await click("Overview"); }
+    }, [[0.3, "The dashboard: agents post offers and attach their legs."], [5.2, "k4 closes the ring and calls execute_intents."],
+      [8.3, "Settled: every bot in the ring hops on the same beat."], [10.8, "Then the next recorded ring starts."]]);
   },
   /* /v2 with every close re-checked on chain in the browser: three held shots with hard cuts, one per ring card
      (mandate ring, ERC-7683 ring, three-wallet ring). Each is scrolled into place and fully re-rastered before its
