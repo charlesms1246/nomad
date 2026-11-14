@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nomad: demo deck</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @font-face { font-family: "Space Grotesk"; src: url(./assets/space-grotesk-latin.woff2) format("woff2"); font-weight: 300 700; }
+  @font-face { font-family: "JetBrains Mono"; src: url(./assets/JetBrainsMono-Regular.woff2) format("woff2"); font-weight: 400; }
+  @font-face { font-family: "JetBrains Mono"; src: url(./assets/JetBrainsMono-Bold.woff2) format("woff2"); font-weight: 700; }
+  html, body { margin: 0; height: 100%; background: #07090d; overflow: hidden; }
+  body { font-family: "Space Grotesk", system-ui, sans-serif; color: #f2f4f8; font-variant-numeric: tabular-nums; }
+  canvas#gl { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  /* the 1920-wide design grid: 1rem = 16px at 1920 */
+  #cap { position: fixed; left: 4.2rem; top: 3.6rem; max-width: 38rem; pointer-events: none; }
+  #cap .t { font-size: 1.85rem; font-weight: 600; line-height: 1.12; letter-spacing: -0.01em; }
+  #cap .s { margin-top: 0.55rem; font-size: 1.12rem; line-height: 1.38; color: #aab3c2; font-weight: 400; max-width: 40rem; }
+  #beat { position: fixed; left: 0; right: 0; bottom: 3.2rem; text-align: center; pointer-events: none; }
+  #beat span { display: inline-block; font-size: 1.42rem; font-weight: 500; padding: 0.5rem 1.2rem; background: rgba(7,9,13,0.72); border-radius: 0.25rem; }
+  #mark { position: fixed; right: 4.2rem; top: 3.9rem; font-size: 1.15rem; font-weight: 600; color: #8b95a7; letter-spacing: 0.01em; pointer-events: none; }
+  #mark b { color: #f2f4f8; font-weight: 700; }
+  #mark i { font-style: normal; color: #3987e5; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="cap"><div class="t"></div><div class="s"></div></div>
+<div id="beat"><span></span></div>
+<div id="mark"><b>Nomad</b> · <i>NEAR testnet</i></div>
+
+<script src="./assets/three.min.js"></script>
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════════════
+   Nomad demo deck: engine.
+   Every frame is a pure function of (scene, t). A URL like
+     index.html#3?t=6.2
+   renders scene 3 at t = 6.2 s and stops (window.__ready = true). With no
+   ?t the deck plays in real time; keys 0-5 switch scenes, space pauses.
+   window.renderAt(scene, t) renders one exact frame (used by the recorder).
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── palette ── */
+const BG = 0x07090d, INK = 0x040507, OUTLINE = 0x040507, ACCENT = 0x3987e5,
+      WHITE = 0xf2f4f8, MUTED = 0x8b95a7, RED = 0xe5484d, STEEL = 0x2a3140;
+const TOK = { wNEAR: 0x3987e5, USDC: 0xd95926, USDT: 0x199e70, ZEC: 0xc98500, BTC: 0xd55181 };
+const css = h => "#" + h.toString(16).padStart(6, "0");
+
+/* ── maths ── */
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (ph, a, b) => clamp01((ph - a) / (b - a));
+const eInOut = p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+const eOutCubic = p => 1 - Math.pow(1 - p, 3);
+const eInCubic = p => p * p * p;
+const eOutBack = (p, s = 1.70158) => { const c3 = s + 1; return 1 + c3 * Math.pow(p - 1, 3) + s * Math.pow(p - 1, 2); };
+const eInBack = (p, s = 1.70158) => (s + 1) * p * p * p - s * p * p;
+/* damped spring settle: 0 at p=0, 1 at rest, overshoots */
+const eSpring = (p, k = 7, f = 2.2) => p <= 0 ? 0 : 1 - Math.exp(-k * p) * Math.cos(f * Math.PI * p);
+/* a hold-aware window: rises a..b, holds, falls c..d */
+const win = (ph, a, b, c, d) => Math.min(seg(ph, a, b), 1 - seg(ph, c, d));
+/* deterministic hash noise */
+const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+/* ── renderer ── */
+const canvas = document.getElementById("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.localClippingEnabled = true;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(BG);
+scene.fog = new THREE.FogExp2(BG, 0.016);
+const camera = new THREE.PerspectiveCamera(36, 16 / 9, 0.1, 900);
+
+const hemi = new THREE.HemisphereLight(0xdfe6f2, 0x10131a, 1.1); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 2.1); sun.position.set(-5, 9, 7); scene.add(sun);
+const rim = new THREE.DirectionalLight(0x9cc1ff, 0.7); rim.position.set(6, 4, -8); scene.add(rim);
+
+/* toon ramp: three flat bands, no gradients */
+const RAMP = (() => { const d = new Uint8Array([90, 170, 255]);
+  const t = new THREE.DataTexture(d, 3, 1, THREE.RedFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const _mats = new Map();
+function mat(color) {
+  if (!_mats.has(color)) _mats.set(color, new THREE.MeshToonMaterial({ color, gradientMap: RAMP }));
+  return _mats.get(color);
+}
+function matU(color) { return new THREE.MeshToonMaterial({ color, gradientMap: RAMP }); } /* unshared */
+const INKMAT = new THREE.MeshBasicMaterial({ color: OUTLINE, side: THREE.BackSide });
+
+/* outlined voxel box: obox(parent, w,h,d, color, x,y,z, {ol, olT, rz, own}) */
+function obox(parent, w, h, d, color, x = 0, y = 0, z = 0, o = {}) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), o.own ? matU(color) : mat(color));
+  m.position.set(x, y, z); if (o.rz) m.rotation.z = o.rz;
+  if (o.ol !== false) {
+    const t = o.olT ?? 0.045;
+    const ol = new THREE.Mesh(new THREE.BoxGeometry(w + 2 * t, h + 2 * t, d + 2 * t), INKMAT);
+    m.add(ol);
+  }
+  parent.add(m); return m;
+}
+/* outline any mesh by an inflated back-face hull */
+function hull(mesh, s = 1.06) {
+  const ol = new THREE.Mesh(mesh.geometry, INKMAT); ol.scale.setScalar(s); mesh.add(ol); return ol;
+}
+function glowSprite(color, size = 1, opacity = 0.5) {
+  if (!glowSprite.tex) { const c = document.createElement("canvas"); c.width = c.height = 64;
+    const x = c.getContext("2d"), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.35, "rgba(255,255,255,0.35)"); g.addColorStop(1, "rgba(255,255,255,0)");
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64); glowSprite.tex = new THREE.CanvasTexture(c); }
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowSprite.tex, color, transparent: true, opacity,
+    blending: THREE.AdditiveBlending, depthWrite: false }));
+  s.scale.setScalar(size); return s;
+}
+
+/* ── text on a plane. label(parent, lines, opts) → mesh with .set(lines) ──
+   lines: string or [{t, size, color, font, weight}] ; drawn at 4 px/unit*res */
+function label(parent, lines, o = {}) {
+  const W = o.w ?? 2, H = o.h ?? 0.5, RES = o.res ?? 256;
+  const cv = document.createElement("canvas"); cv.width = Math.round(W * RES); cv.height = Math.round(H * RES);
+  const x = cv.getContext("2d");
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(W, H),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, fog: false }));
+  m.renderOrder = o.order ?? 5;
+  let last = null;
+  m.set = (ls) => {
+    const key = JSON.stringify(ls); if (key === last) return; last = key;
+    x.clearRect(0, 0, cv.width, cv.height);
+    if (o.bg != null) { x.fillStyle = typeof o.bg === "number" ? css(o.bg) : o.bg;
+      const r = (o.radius ?? 0.06) * RES; x.beginPath(); x.roundRect(0, 0, cv.width, cv.height, r); x.fill();
+      if (o.border != null) { x.lineWidth = (o.borderW ?? 0.03) * RES; x.strokeStyle = css(o.border); x.stroke(); } }
+    const arr = (typeof ls === "string" ? [{ t: ls }] : ls).map(l => typeof l === "string" ? { t: l } : l);
+    const al = o.align ?? "center";
+    x.textAlign = al; x.textBaseline = "middle";
+    const sizes = arr.map(l => (l.size ?? o.size ?? 0.22) * RES), gap = (o.gap ?? 0.3);
+    const total = sizes.reduce((a, s) => a + s * (1 + gap), 0) - sizes[sizes.length - 1] * gap;
+    let y = (o.valign === "top" ? (o.pad ?? 0.12) * RES : (cv.height - total) / 2);
+    arr.forEach((l, i) => {
+      const s = sizes[i];
+      x.font = `${l.weight ?? o.weight ?? 600} ${s}px 'Space Grotesk'`;
+      x.fillStyle = css(l.color ?? o.color ?? WHITE);
+      const px = al === "left" ? (o.pad ?? 0.12) * RES : al === "right" ? cv.width - (o.pad ?? 0.12) * RES : cv.width / 2;
+      x.fillText(l.t, px, y + s / 2);
+      y += s * (1 + gap);
+    });
+    tex.needsUpdate = true;
+  };
+  m.set(lines);
+  if (parent) parent.add(m);
+  return m;
+}
+
+/* dot-grid floor */
+function gridFloor(parent, size = 60, rgb = "57,135,229") {
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const x = c.getContext("2d"); x.fillStyle = `rgba(${rgb},0.30)`; x.fillRect(0, 0, 128, 2); x.fillRect(0, 0, 2, 128);
+  x.fillStyle = `rgba(${rgb},0.6)`; x.fillRect(0, 0, 4, 4);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(size / 1.5, size / 1.5);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
+    new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: 0.55 }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.005; m.renderOrder = -2; parent.add(m);
+  /* stage disc so characters stand on something */
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(size * 0.2, 64),
+    new THREE.MeshBasicMaterial({ color: 0x111827, depthWrite: false }));
+  disc.rotation.x = -Math.PI / 2; disc.renderOrder = -3; parent.add(disc);
+  return m;
+}
+function softShadow(parent, r = 0.7) {
+  if (!softShadow.tex) { const c = document.createElement("canvas"); c.width = c.height = 64;
+    const x = c.getContext("2d"), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(0,0,0,0.75)"); g.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    softShadow.tex = new THREE.CanvasTexture(c); }
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2),
+    new THREE.MeshBasicMaterial({ map: softShadow.tex, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.012; m.renderOrder = -1; m.userData.noqa = true; parent.add(m); return m;
+}
+
+/* burst: n flat shards thrown out from a point, a pure function of age */
+function makeBurst(parent, color, n = 14, o = {}) {
+  const g = new THREE.Group(); parent.add(g); const parts = [];
+  for (let i = 0; i < n; i++) {
+    const m = obox(g, 0.09, 0.09, 0.09, color, 0, 0, 0, { olT: 0.02 });
+    const a = (i / n) * Math.PI * 2 + hash(i + (o.seed ?? 0)) * 0.6, up = 0.6 + hash(i * 3.1) * 1.2;
+    parts.push({ m, vx: Math.cos(a) * (1.4 + hash(i * 7) * 1.2), vz: Math.sin(a) * (1.4 + hash(i * 5) * 1.2) * (o.flat ? 0.2 : 1), vy: up * 2.4 });
+  }
+  g.visible = false;
+  return { g, update(age) {
+    const L = o.life ?? 0.9;
+    g.visible = age >= 0 && age < L; if (!g.visible) return;
+    const sc = (o.scale ?? 1) * (1 - age / L);
+    for (const p of parts) { p.m.position.set(p.vx * age, p.vy * age - 4.9 * age * age, p.vz * age);
+      p.m.scale.setScalar(Math.max(0.001, sc)); p.m.rotation.set(age * 7, age * 5, 0); }
+  } };
+}
+
+/* ── the scene registry ──
+   registerScene({ key, loop, build(g) → { update(ph) }, shots:[...], kicks:[[t,amp]], cap:{t,s}, beats:[[t,text]], env }) */
+const SCENES = [];
+let NOW = 0;
+/* every token cube turns (yaw only) to face the camera, so its label always reads */
+const TOKENS = [];
+const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _wp = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+function faceTokens(root) {
+  root.updateMatrixWorld(true);
+  for (const t of TOKENS) {
+    if (!t.g.parent) continue;
+    let o = t.g, vis = true; while (o) { if (!o.visible) { vis = false; break; } o = o.parent; }
+    if (!vis) continue;
+    t.g.getWorldPosition(_wp);
+    const yaw = Math.atan2(camera.position.x - _wp.x, camera.position.z - _wp.z);
+    t.g.parent.getWorldQuaternion(_q).invert();
+    _q2.setFromAxisAngle(_up, yaw);
+    t.g.quaternion.copy(_q.multiply(_q2));
+  }
+}
+function registerScene(s) { SCENES.push(s); }
+</script>
+
+<script src="./parts/env.js"></script>
+<script src="./parts/cast.js"></script>
+<script src="./parts/s0-need.js"></script>
+<script src="./parts/s1-pairs.js"></script>
+<script src="./parts/s2-loop.js"></script>
+<script src="./parts/s3-close.js"></script>
+<script src="./parts/s4-wallets.js"></script>
+<script src="./parts/s5-proof.js"></script>
+
+<script>
+"use strict";
+/* ── boot ── */
+const capT = document.querySelector("#cap .t"), capS = document.querySelector("#cap .s"),
+      capBox = document.getElementById("cap"), beatBox = document.getElementById("beat"),
+      beatSpan = document.querySelector("#beat span");
+const built = [];
+let world = null;
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  document.documentElement.style.fontSize = (16 * w / 1920) + "px";
+}
+
+function build() {
+  world = makeEnvironment(scene, { kind: "racks", accent: ACCENT, seed: 11, density: 0.9, motes: 8 });
+  SCENES.forEach((s, i) => {
+    const g = new THREE.Group(); g.visible = false; scene.add(g);
+    gridFloor(g, 60);
+    built[i] = { g, api: s.build(g) };
+  });
+}
+
+/* camera: shots are [t0, t1, from, to, ease]; a shot is {p:[x,y,z], l:[x,y,z], fov}.
+   Hard cuts between shots, movement only inside one. */
+const _p = V(0, 0, 0), _l = V(0, 0, 0);
+function rig(s, ph) {
+  const shots = s.shots;
+  let sh = shots[shots.length - 1];
+  for (const x of shots) if (ph >= x[0] && ph < x[1]) { sh = x; break; }
+  const [t0, t1, A, B, ease] = sh;
+  const u = (ease || eInOut)(seg(ph, t0, t1));
+  const b = B || A;
+  _p.set(lerp(A.p[0], b.p[0], u), lerp(A.p[1], b.p[1], u), lerp(A.p[2], b.p[2], u));
+  _l.set(lerp(A.l[0], b.l[0], u), lerp(A.l[1], b.l[1], u), lerp(A.l[2], b.l[2], u));
+  let fov = lerp(A.fov, b.fov ?? A.fov, u);
+  /* sway: tiny, slow */
+  _p.x += Math.sin(ph * 0.7) * 0.03; _p.y += Math.sin(ph * 0.53 + 1) * 0.02;
+  /* kicks: decaying shake on every impact */
+  let k = 0;
+  for (const [t, amp] of (s.kicks || [])) { const a = ph - t; if (a >= 0 && a < 0.6)
+    k += amp * Math.exp(-a * 9) * Math.sin(a * 55); }
+  _p.y += k * 0.16; _l.y += k * 0.1; _p.x += k * 0.05; fov -= Math.abs(k) * 1.2;
+  camera.position.copy(_p); camera.lookAt(_l);
+  camera.rotation.z += k * 0.012;
+  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+}
+
+function captions(s, ph) {
+  const c = s.cap || {};
+  if (capT.textContent !== (c.t || "")) capT.textContent = c.t || "";
+  if (capS.textContent !== (c.s || "")) capS.textContent = c.s || "";
+  capBox.style.opacity = eOutCubic(seg(ph, 0.1, 0.3)) * (1 - seg(ph, s.loop - 0.18, s.loop));
+  capBox.style.transform = `translateY(${(1 - eOutCubic(seg(ph, 0.1, 0.3))) * 0.4}rem)`;
+  let txt = "", a = 0;
+  const bs = s.beats || [];
+  for (let i = 0; i < bs.length; i++) {
+    const [t, line] = bs[i], tn = i + 1 < bs.length ? bs[i + 1][0] : s.loop;
+    if (ph >= t && ph < tn) { txt = line; a = seg(ph, t, t + 0.18) * (tn >= s.loop ? 1 - seg(ph, s.loop - 0.18, s.loop) : 1); }
+  }
+  if (beatSpan.textContent !== txt) beatSpan.textContent = txt;
+  beatBox.style.opacity = txt ? a : 0;
+}
+
+let cur = -1;
+function renderAt(si, t) {
+  si = Math.max(0, Math.min(SCENES.length - 1, si | 0));
+  const s = SCENES[si], ph = ((t % s.loop) + s.loop) % s.loop;
+  if (cur !== si) { built.forEach((b, i) => b.g.visible = i === si); cur = si; }
+  NOW = ph;
+  rig(s, ph);
+  built[si].api.update(ph);
+  world.update(ph + si * 40);
+  faceTokens(built[si].g);
+  captions(s, ph);
+  renderer.render(scene, camera);
+}
+window.renderAt = renderAt;
+/* QA: every registered subject must be either fully inside the frame (4 px margin)
+   or fully outside, and must not overlap the visible caption blocks. */
+const SUBJECTS = [];
+function subject(obj, name) { SUBJECTS.push({ obj, name }); return obj; }
+const _b = new THREE.Box3(), _c = new THREE.Vector3();
+function qa() {
+  const W = innerWidth, H = innerHeight, out = [];
+  const rects = [];
+  if (+capBox.style.opacity > 0.02) rects.push(["caption", capBox.getBoundingClientRect()]);
+  if (+beatBox.style.opacity > 0.02 && beatSpan.textContent) rects.push(["beat", beatSpan.getBoundingClientRect()]);
+  scene.updateMatrixWorld(true);
+  for (const s of SUBJECTS) {
+    let o = s.obj, vis = true; while (o) { if (!o.visible) { vis = false; break; } o = o.parent; }
+    if (!vis) continue;
+    /* exact screen bounds: project every vertex of every visible mesh (shadows excluded) */
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, n = 0;
+    s.obj.traverseVisible(m => {
+      if (!m.isMesh || m.userData.noqa || (m.material && m.material.transparent && m.material.opacity < 0.05)) return;
+      if (m.scale.x < 0.01) return;
+      const pa = m.geometry.attributes.position; if (!pa) return;
+      for (let i = 0; i < pa.count; i++) {
+        _c.fromBufferAttribute(pa, i).applyMatrix4(m.matrixWorld).project(camera);
+        if (_c.z > 1 || _c.z < -1) continue; n++;
+        const sx = (_c.x + 1) / 2 * W, sy = (1 - _c.y) / 2 * H;
+        if (sx < x0) x0 = sx; if (sx > x1) x1 = sx; if (sy < y0) y0 = sy; if (sy > y1) y1 = sy;
+      }
+    });
+    if (!n) continue;
+    const inside = x0 >= 4 && y0 >= 4 && x1 <= W - 4 && y1 <= H - 4;
+    const outside = x1 < 0 || y1 < 0 || x0 > W || y0 > H;
+    if (!inside && !outside) out.push(`${s.name} cut by frame edge [${x0 | 0},${y0 | 0},${x1 | 0},${y1 | 0}]`);
+    for (const [n, r] of rects) if (x0 < r.right && x1 > r.left && y0 < r.bottom && y1 > r.top) out.push(`${s.name} under ${n}`);
+  }
+  return out;
+}
+window.qa = qa;
+window.sceneInfo = () => SCENES.map(s => ({ key: s.key, loop: s.loop, cap: s.cap, beats: s.beats }));
+
+function parseHash() {
+  const m = location.hash.match(/^#(\d+)(?:\?t=([\d.]+))?/);
+  return { si: m ? +m[1] : 0, t: m && m[2] != null ? +m[2] : null };
+}
+
+Promise.all([
+  document.fonts.load("600 20px 'Space Grotesk'"), document.fonts.load("400 20px 'Space Grotesk'"),
+  document.fonts.load("700 20px 'JetBrains Mono'"), document.fonts.load("400 20px 'JetBrains Mono'"),
+]).catch(() => {}).then(() => {
+  return Promise.all(PRELOAD.slice());          /* live data reads, before the sets are built */
+}).then(() => {
+  resize(); build();
+  return Promise.all(PRELOAD);                  /* textures created while building */
+}).then(() => {
+  const q = parseHash();
+  if (q.t != null || /[?&]still/.test(location.search)) {
+    renderAt(q.si, q.t ?? 0); window.__ready = true; return;
+  }
+  let si = q.si, t0 = performance.now(), paused = false, tp = 0;
+  addEventListener("resize", resize);
+  addEventListener("hashchange", () => { si = parseHash().si; t0 = performance.now(); });
+  addEventListener("keydown", e => {
+    if (/^[0-9]$/.test(e.key) && +e.key < SCENES.length) { si = +e.key; t0 = performance.now(); history.replaceState(null, "", "#" + si); }
+    if (e.key === " ") { paused = !paused; if (!paused) t0 = performance.now() - tp * 1000; }
+    if (e.key === "ArrowRight") { si = (si + 1) % SCENES.length; t0 = performance.now(); }
+  });
+  (function loop() {
+    if (!paused) tp = (performance.now() - t0) / 1000;
+    renderAt(si, tp); requestAnimationFrame(loop);
+  })();
+  window.__ready = true;
+});
+</script>
+</body>
+</html>
