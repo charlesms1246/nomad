@@ -28,7 +28,7 @@ const BLOCKS = [
   { name: "Website: landing hero", file: "web-hero.mp4", pieces: [[0.5, 5.5]], zoom: [1.0, 1.1, 0.5, 0.42] },
   { name: "Website: ring replay", file: "web-replay.mp4",
     pieces: [[0.3, 2.6], [3.2, 7.0], [8.4, 11.2], [12.0, 15.4], [16.2, 18.6], [19.4, 21.2]], zoom: [1.0, 1.14, 0.5, 0.44] },
-  { name: "Website: /dashboard workshop", file: "web-dashboard.mp4", pieces: [[0, 12.5]], zoom: [1.0, 1.16, 0.36, 0.42] },
+  { name: "Website: /dashboard workshop", file: "web-dashboard.mp4", pieces: [[0, 12.5]], zoom: [1.0, 1.07, 0.47, 0.42] },
   ...v2.map((s, i) => ({ name: `Website: /v2?verify=1 shot ${i + 1}`, file: s.file, pieces: [[0, s.secs]], zoom: [1.0, 1.12, s.cx, s.cy] })),
   { name: "Scene 5: proof", file: "deck-s5.mp4", pieces: [[0, 15.5]] },
   { name: "Figure: 27 rings settled, 0 failed", png: "cards/num-1.png", secs: 2.4, zoom: [1.0, 1.06, 0.5, 0.45] },
