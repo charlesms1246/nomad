@@ -4,6 +4,8 @@
 
 Tracks: **AI Swarms** and **DeFi**.
 
+**Live UI:** https://nomad-swarm.vercel.app is the dashboard. With no live matcher behind it, it shows recorded real testnet data labelled as such. https://nomad-swarm.vercel.app/v2?verify=1 shows the v2 rings, each re-checked on chain in your browser.
+
 **Network: NEAR testnet only.** `intents.near` exists only on mainnet. Our testnet Verifier `intents.nomadswarm.testnet` runs **mainnet `intents.near`'s exact wasm**: the code hash is `BtA1BEFNS619KkvXFsgcpQ21Tb5yMm32aaUkn7xNothk` on both. Mainnet is used only for read-only view calls (`simulate_intents`, 1Click dry quotes). Every figure below comes with its tx hash as a NearBlocks link, so it can be checked on chain without anything else from us.
 
 Anyone can check the code hash with two RPC calls:
@@ -103,7 +105,7 @@ Output below was captured from this repo on 2026-11-14.
 | 3 | `make mainnet-proof` | `ring (3 agents), leg 1 first: insufficient balance or overflow` (and the same for legs 2 and 3), then `control: corrupted signature: invalid signature` and `control: zero salt: invalid salt`. This is read-only `simulate_intents` on **mainnet `intents.near`** |
 | 4 | `make test` | Each TypeScript package reports `Tests N passed`. Then the board's Rust tests report `test result: ok`. The v2 contracts test separately: `cd contracts/rings && cargo test` (16 passed) and `cd contracts/mandate && cargo test` (14 passed) |
 | 5 | `cd web && npm install && npm run dev` | The UI at http://localhost:3000. With no reachable `MATCHER_URL`, it shows a recorded real testnet state (a 3-way race capture, with real tx links) labelled **Recorded testnet data · 2026-11-13 23:53 UTC**. `make sim-serve` plus `make ui` shows a running simulation, labelled **Simulation**. `MATCHER_URL=http://localhost:1 make ui-check` prints `ui-check: source=recorded agents=12 rings=18 settled=6` |
-| 6 | `cd web && npm run dev`, then open http://localhost:3000/v2?verify=1 | The v2 rings, read from `rings.nomadswarm.testnet` straight from testnet RPC in the browser. Each ring shows its legs' wallet standards and a "closed by a stranger" badge, and there's a reputation table. With `?verify=1`, each closed ring is re-checked on chain on load and shows, for example, `Verified on chain: k4 (not one of the agents) called close_ring in block 277,670,820. The contract's execute_intents ran in block 277,670,822 (2 blocks later, one cross-contract hop), status SuccessValue, settling 3 legs in 3 wallet standards.` We checked all 4 closed rings this way in a headless browser on 2026-11-14. Hosted: `<UI URL>/v2?verify=1` once deployed |
+| 6 | `cd web && npm run dev`, then open http://localhost:3000/v2?verify=1 | The v2 rings, read from `rings.nomadswarm.testnet` straight from testnet RPC in the browser. Each ring shows its legs' wallet standards and a "closed by a stranger" badge, and there's a reputation table. With `?verify=1`, each closed ring is re-checked on chain on load and shows, for example, `Verified on chain: k4 (not one of the agents) called close_ring in block 277,670,820. The contract's execute_intents ran in block 277,670,822 (2 blocks later, one cross-contract hop), status SuccessValue, settling 3 legs in 3 wallet standards.` We checked all 4 closed rings this way in a headless browser on 2026-11-14. Hosted: https://nomad-swarm.vercel.app/v2?verify=1 |
 | 7 | Testnet proof | The tx links under [Deployments](#deployments) |
 
 What `make mainnet-proof` shows, and no more:
