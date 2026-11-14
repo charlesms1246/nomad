@@ -102,7 +102,7 @@ function CheckResult({ ix, ring, r }: { ix: TokenIndex; ring: V2Ring; r: V2Verif
         )}
         {!ok && r.success !== (ring.status === "Settled") && <> The contract says “{ring.status}”, but the chain says the batch {r.success ? "succeeded" : "failed"}.</>}
       </p>
-      <table className="w-full text-left">
+      <div className="-mx-1 overflow-x-auto px-1"><table className="w-full min-w-[560px] text-left">
         <thead className="text-[#898781]">
           <tr>
             <th className="py-1 pr-2 font-normal">Leg</th>
@@ -125,7 +125,7 @@ function CheckResult({ ix, ring, r }: { ix: TokenIndex; ring: V2Ring; r: V2Verif
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <p className="leading-relaxed text-[#5c5b57]">
         Close tx{" "}
         <a href={`${EXPLORER}/txns/${r.txHash}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[#86b6ef] hover:underline">
@@ -232,7 +232,7 @@ function RingCard({ ix, ring, auto, extras }: { ix: TokenIndex; ring: V2Ring; au
         </p>
       </header>
 
-      <table className="mt-4 w-full text-left text-xs">
+      <div className="-mx-1 overflow-x-auto px-1"><table className="mt-4 w-full min-w-[560px] text-left text-xs">
         <thead className="text-[#898781]">
           <tr className="border-b border-white/5">
             <th className="py-1.5 pr-3 font-normal">Agent</th>
@@ -271,7 +271,7 @@ function RingCard({ ix, ring, auto, extras }: { ix: TokenIndex; ring: V2Ring; au
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
 
       {extras &&
         ring.legs.map((l, i) => {
@@ -367,7 +367,7 @@ function ReputationTable({ rings }: { rings: V2Ring[] }) {
         <h2 className="text-sm font-medium text-[#c3c2b7]">Reputation</h2>
         <p className="text-[11px] text-[#898781]">Written only by the contract when a close succeeds or fails · view reputation(agent)</p>
       </header>
-      <table className="mt-3 w-full text-left text-xs">
+      <div className="-mx-1 overflow-x-auto px-1"><table className="mt-3 w-full min-w-[560px] text-left text-xs">
         <thead className="text-[#898781]">
           <tr className="border-b border-white/5">
             <th className="py-1.5 pr-3 font-normal">Account</th>
@@ -401,7 +401,7 @@ function ReputationTable({ rings }: { rings: V2Ring[] }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </section>
   );
 }

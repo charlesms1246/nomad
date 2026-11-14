@@ -3,26 +3,43 @@
 // the WebGL background finish. It also emulates mobile viewports and prefers-reduced-motion.
 // usage: node scripts/cdp-shot.mjs <chrome-binary> <url> <out.png> [width=1440] [height=900] [waitMs=4000] [fullPage=0] [reduced=0] [scroll=0|#elementId]
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const [bin, url, out, w = "1440", h = "900", wait = "4000", full = "0", reduced = "0", scroll = "0"] = process.argv.slice(2);
 const port = 9300 + Math.floor(Math.random() * 500);
+// A fresh profile per run: a second Chrome on the default profile can attach to an older,
+// still-running one, which makes runs stall at random.
+const profile = mkdtempSync(join(tmpdir(), "cdp-shot-"));
 const chrome = spawn(bin, [
+  `--user-data-dir=${profile}`,
   `--remote-debugging-port=${port}`,
   "--hide-scrollbars",
   // Match the window to the emulated viewport: with the default 800x600 window, desktop-width
   // emulation can stall Page.captureScreenshot indefinitely.
   `--window-size=${w},${h}`,
+  // Keep producing frames even if the OS thinks the window is hidden or the machine is busy;
+  // otherwise Page.captureScreenshot can wait forever for a frame.
+  "--disable-background-timer-throttling",
+  "--disable-renderer-backgrounding",
+  "--disable-backgrounding-occluded-windows",
   // WebGL (the landing background) needs SwiftShader in headless mode; CDP_NO_GL=1 drops it.
   ...(process.env.CDP_NO_GL ? ["--disable-gpu"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]),
   "about:blank",
-], { stdio: "ignore" });
+], { stdio: "ignore", detached: true });
+// Kill Chrome's whole process group (renderer and GPU children too) on every exit path.
+const killChrome = () => {
+  try { process.kill(-chrome.pid, "SIGKILL"); } catch {}
+  try { rmSync(profile, { recursive: true, force: true }); } catch {}
+};
+process.on("exit", killChrome);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Never hang a caller (ui-check): give up after 60 s.
 setTimeout(() => {
   console.error(`${out}: gave up after 60 s`);
-  chrome.kill();
+  killChrome();
   process.exit(1);
 }, 60_000).unref();
 let target;
@@ -34,7 +51,7 @@ for (let i = 0; i < 50 && !target; i++) {
   } catch {}
 }
 if (!target) {
-  chrome.kill();
+  killChrome();
   throw new Error("chrome did not start");
 }
 
@@ -66,6 +83,8 @@ await send("Runtime.enable");
 await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: mobile ? 2 : 1, mobile });
 if (reduced === "1") await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+await send("Page.bringToFront");
+await send("Emulation.setFocusEmulationEnabled", { enabled: true });
 await send("Page.navigate", { url });
 await sleep(+wait);
 if (scroll.startsWith("#")) {
@@ -86,11 +105,11 @@ if (full === "1") {
 const shot = await send("Page.captureScreenshot", { format: "png", ...(clip ? { clip, captureBeyondViewport: true } : {}) });
 if (!shot.result) {
   console.error(`${out}: captureScreenshot failed: ${JSON.stringify(shot.error)}`);
-  chrome.kill();
+  killChrome();
   process.exit(1);
 }
 writeFileSync(out, Buffer.from(shot.result.data, "base64"));
 const ow = await send("Runtime.evaluate", { expression: "document.documentElement.scrollWidth > window.innerWidth ? 'HORIZONTAL OVERFLOW ' + document.documentElement.scrollWidth : 'no overflow'", returnByValue: true });
 console.log(out, ow.result.result.value, logs.length ? "\n" + logs.map((l) => l.split("\n")[0]).join("\n") : "");
 ws.close();
-chrome.kill();
+killChrome();
