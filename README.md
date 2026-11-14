@@ -25,7 +25,7 @@ Output below was captured from this repo on 2026-11-14.
 |---|---|---|
 | 1 | `make sim` | `sim backend=ledger (7 ms) agents=20 tokens=5 seed=1 rounds=30: settled 11 rings (k=2:5 k=3:3 k=4:2 k=5:1), cleared 47% of offers by rings (18/38), 53% fell back to 1Click; agents' mean rate vs mid -18.3 bps vs 1Click baseline -49 bps => saved 30.7 bps; failed rings 0`. It is followed by a sweep over 3/5/8 tokens × 10–200 agents, and `out/clearing-rate.svg` and `out/ring-lengths.svg`. `SIM_BACKEND=model make sim` runs the same sim on the Verifier model with real ed25519 signatures |
 | 2 | `make dry-run` | `ring-3.json: simulate_intents on intents.nomadswarm.testnet: 4 intents_executed (3 agents + matcher)`, then the same for ring-4 (5) and ring-5 (6). This is a read-only call to our testnet Verifier with committed signed fixtures |
-| 3 | `node packages/colo/dist/cli.js where intents-matcher.nomadswarm.testnet` (after step 1, which builds) | `intents-matcher.nomadswarm.testnet → shard 7 ["game.hot.tg-0", "kkuuue2akv_1630967379.near") (testnet)`, read from the live shard layout |
+| 3 | `make colo-check` | `OK: intents-matcher.nomadswarm.testnet shard 7, intents.nomadswarm.testnet shard 7`, read from the live shard layout. `node packages/colo/dist/cli.js where <account>` prints any account's shard |
 | 4 | `make test` | Each TypeScript package reports `Tests N passed`: 108 passed, with 4 live-network tests skipped. Then the board's Rust tests report `test result: ok. 40 passed` |
 | 5 | `cd web && npm install && npm run dev` | The UI at http://localhost:3000. With no `MATCHER_URL` set, it shows a fixture labelled **MOCK DATA**. `make sim-serve` plus `make ui` shows a running simulation instead |
 | 6 | Testnet proof | The tx links under [Deployments](#deployments) |
@@ -125,11 +125,11 @@ All on NEAR testnet. Explorer: `https://testnet.nearblocks.io/txns/<hash>`.
 | Verifier (near/intents defuse 0.4.5, unmodified, our build) | `intents.nomadswarm.testnet` | Deploy + `new`: [`B2ZwQmRV…`](https://testnet.nearblocks.io/txns/B2ZwQmRVh2MmWcZzRkchHoCkXcUrPhqxPiaeL3ZehjAZ) |
 | Verifier fee collector (1 pip) | `fees.nomadswarm.testnet` | A balance inside the Verifier only; no on-chain account is needed (K6) |
 | Test tokens | `wnear`, `usdc`, `usdt`, `btc`, `zec` `.nomadswarm.testnet` | [config/testnet.json](config/testnet.json) |
-| Offer board | `board.nomadswarm.testnet` | [scripts/deploy-board.mjs](scripts/deploy-board.mjs) |
-| Matcher, signing as the Verifier (relayer key, `execute_intents` only) | `intents-matcher-1.nomadswarm.testnet` | 3-way race winner: [`B3nwWbx8…`](https://testnet.nearblocks.io/txns/B3nwWbx8dptDiVobQpfuaq1h9xVrDh6gXyp9iAVTyKPg) (0 blocks) |
-| Matcher on the Verifier's shard (7) | `intents-matcher.nomadswarm.testnet` | [`DqhyqX6n…`](https://testnet.nearblocks.io/txns/DqhyqX6n2aG735hN51HSbSA13xraqP52JKGnZrs19GJ5) (lost the race, 1 block) |
-| Matcher on another shard (4) | `matcher.nomadswarm.testnet` | [`3H8CPxrV…`](https://testnet.nearblocks.io/txns/3H8CPxrVrTWP2uu2yqgpVdTrj928rDqM5kFdg33PLWKi) (lost the race, 1 block) |
-| Live agents | `a01` … `a12` `.nomadswarm.testnet` | |
+| Offer board | `board.nomadswarm.testnet` | Create + deploy + `new`: [`qrQaozvX…`](https://testnet.nearblocks.io/txns/qrQaozvXXHwSMUkLfmWwzNQhaoNUZjW4pWpfD5mVxDX) ([scripts/deploy-board.mjs](scripts/deploy-board.mjs)); `add_matcher`: [`9xFg3fgs…`](https://testnet.nearblocks.io/txns/9xFg3fgsTMbxUKfGixus5fKoHx7wLBMgTiXsA3FuhyiN), [`7EvwrQXX…`](https://testnet.nearblocks.io/txns/7EvwrQXXXS78PW8cQ5N4xB5wzF4r6hffHUGXi93YLCqV) |
+| Matcher, signing as the Verifier (relayer key, `execute_intents` only) | `intents-matcher-1.nomadswarm.testnet` | Relayer key `AddKey`: [`EytNTDhc…`](https://testnet.nearblocks.io/txns/EytNTDhc8KSSJ6XeT8CE2maSdNxwG3vkF1kfRuBRtUsg). 3-way race winner: [`B3nwWbx8…`](https://testnet.nearblocks.io/txns/B3nwWbx8dptDiVobQpfuaq1h9xVrDh6gXyp9iAVTyKPg) (0 blocks) |
+| Matcher on the Verifier's shard (7) | `intents-matcher.nomadswarm.testnet` | Created [`3DNE9SS8…`](https://testnet.nearblocks.io/txns/3DNE9SS8LoDCkpK8sZZX7eRspBsS88y6VMySv73h5yde); [`DqhyqX6n…`](https://testnet.nearblocks.io/txns/DqhyqX6n2aG735hN51HSbSA13xraqP52JKGnZrs19GJ5) (lost the race, 1 block) |
+| Matcher on another shard (4) | `matcher.nomadswarm.testnet` | Created [`5jFWwnWS…`](https://testnet.nearblocks.io/txns/5jFWwnWSYSNLJffkY1kYZjUj5HTpePmo1FJRfCpspUyM); [`3H8CPxrV…`](https://testnet.nearblocks.io/txns/3H8CPxrVrTWP2uu2yqgpVdTrj928rDqM5kFdg33PLWKi) (lost the race, 1 block) |
+| Live agents | `a01` … `a12` `.nomadswarm.testnet` | `a01` created [`DE8HzxKp…`](https://testnet.nearblocks.io/txns/DE8HzxKpCm13mLMPDUG55GxtK27NH5DG8V1mS4JZEmDc) |
 | Fixture agents (sign `fixtures/rings`) | `fx01` … `fx12` `.nomadswarm.testnet` | `make dry-run` |
 | K7 arms | `k7colo` (shard 7), `zk7ctl` (shard 5) `.nomadswarm.testnet` | [K7](docs/MEASUREMENTS.md#k7-which-txs-execute-in-the-inclusion-block-k7-colots) |
 | HoS demo | `nomad-agent-01.tla`, `treasury`, `hosauth`, `hosrt` `.nomadswarm.testnet` | [docs/HOS_BUDGETS.md](docs/HOS_BUDGETS.md) |
