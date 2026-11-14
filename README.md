@@ -4,27 +4,6 @@
 
 Tracks: **AI Swarms** and **DeFi**. Network: **NEAR testnet**. Live site: **https://nomad.charlesms.dev**
 
-## Contents
-
-- [The problem](#the-problem)
-- [How Nomad solves it](#how-nomad-solves-it)
-- [Concepts](#concepts)
-- [Try it in 5 minutes, no install](#try-it-in-5-minutes-no-install)
-- [How it works](#how-it-works)
-  - [System architecture](#system-architecture)
-  - [One ring, start to finish](#one-ring-start-to-finish)
-  - [Mandates: an agent with limits and no hot key](#mandates-an-agent-with-limits-and-no-hot-key)
-  - [ERC-7683 orders from Ethereum wallets](#erc-7683-orders-from-ethereum-wallets)
-  - [Off-chain swarm mode](#off-chain-swarm-mode)
-- [Proof on testnet](#proof-on-testnet)
-- [Reproduce locally](#reproduce-locally)
-- [Run it on testnet yourself](#run-it-on-testnet-yourself)
-- [Contract API](#contract-api)
-- [Repository layout](#repository-layout)
-- [Deployments](#deployments)
-- [Limits](#limits)
-- [Built with](#built-with)
-
 ## The problem
 
 A swap usually goes through a market maker or a solver, who takes the other side of the trade and charges a spread for it. Often the opposite trade already exists, but not as a pair. Someone holds USDC and wants USDT. A second person holds USDT and wants ZEC. A third holds ZEC and wants USDC. No two of them can trade directly with each other, so each of them goes to an intermediary.
