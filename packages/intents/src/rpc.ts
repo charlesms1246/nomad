@@ -57,6 +57,9 @@ export class NearRpc {
     this.urls = [...new Set([url, ...fallbacks, ...env])];
   }
 
+  /** Client-side timeout per call (ms). Overridable for tests. */
+  timeoutMs = (method: string) => (method === 'send_tx' ? 70_000 : 20_000);
+
   async call<T = any>(method: string, params: unknown, retries = 6): Promise<T> {
     let lastErr: unknown;
     for (let i = 0; i <= retries; i++) {
@@ -64,17 +67,19 @@ export class NearRpc {
         // Client-side timeout: a stalled RPC connection must not hang the caller forever.
         // send_tx waits for execution, so it gets longer; a timeout surfaces as "fetch failed",
         // which sendTx handles by polling the tx status (no double-send: same signed bytes).
+        // The signal also covers reading the body, so a stall after the headers is mapped the same way.
+        const onTimeout = (e: unknown): never => {
+          if ((e as Error)?.name === 'TimeoutError' || (e as Error)?.name === 'AbortError') throw new RpcError(`fetch failed: client timeout on ${method}`);
+          throw e;
+        };
         const r = await fetch(this.urls[this.cur % this.urls.length]!, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 'nomad', method, params }),
-          signal: AbortSignal.timeout(method === 'send_tx' ? 70_000 : 20_000),
-        }).catch((e: unknown) => {
-          if ((e as Error)?.name === 'TimeoutError' || (e as Error)?.name === 'AbortError') throw new RpcError(`fetch failed: client timeout on ${method}`);
-          throw e;
-        });
+          signal: AbortSignal.timeout(this.timeoutMs(method)),
+        }).catch(onTimeout);
         if (r.status === 429 || r.status >= 500) throw new RpcError(`HTTP ${r.status}`);
-        const j: any = await r.json();
+        const j: any = await r.json().catch(onTimeout);
         if (j.error) {
           const name = j.error?.cause?.name ?? j.error?.name;
           // transient
