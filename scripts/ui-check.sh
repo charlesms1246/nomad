@@ -8,10 +8,17 @@ SIM_PORT="${SIM_PORT:-8791}"; UI_PORT="${UI_PORT:-3091}"
 MATCHER_URL="${MATCHER_URL:-http://localhost:$SIM_PORT}"
 PIDS=()
 mkdir -p "$ROOT/out/ui-check"
+if lsof -nP -t -i "tcp:$SIM_PORT" -i "tcp:$UI_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "ui-check: ports $SIM_PORT/$UI_PORT are busy (a previous run?); free them first" >&2; exit 1
+fi
 if pgrep -f "next dev" >/dev/null && lsof -t "$ROOT/web/.next/dev" >/dev/null 2>&1; then
   echo "ui-check: a web/ dev server is already running (Next allows one per project); stop it first" >&2; exit 1
 fi
-cleanup() { for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done; }
+cleanup() {
+  for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done
+  # the subshells' children (tsx, next) outlive their parents: kill whatever holds our ports
+  lsof -nP -t -i "tcp:$SIM_PORT" -i "tcp:$UI_PORT" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true
+}
 trap cleanup EXIT
 if [[ "$MATCHER_URL" == "http://localhost:$SIM_PORT" ]]; then
   (cd "$ROOT/apps/matcher" && AGENTS=12 TOKENS=5 SEED=1 SWEEP=0 SERVE=1 ROUND_MS=1500 PORT="$SIM_PORT" OUT_DIR="$ROOT/out/ui-check" pnpm exec tsx src/cli-sim.ts >"$ROOT/out/ui-check/sim.log" 2>&1) &

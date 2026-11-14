@@ -6,6 +6,7 @@ import { shortAgent } from "@/lib/format";
 
 const S1 = "#3987e5"; // categorical slot 1 (dark)
 const S2 = "#d95926"; // categorical slot 2 (dark)
+const S3 = "#2e9e6b"; // categorical slot 3 (dark)
 const GRID = "#2c2c2a";
 const AXIS = "#383835";
 const MUTED = "#898781";
@@ -81,7 +82,7 @@ export function SwarmPanel({ swarm }: { swarm: SwarmStats | null }) {
   return (
     <Panel
       title="Swarm"
-      note={`${swarm.source === "sim" ? "make sim" : "live"}${swarm.seed != null ? `, seed ${swarm.seed}` : ""}, ${pts[0].tokens} tokens`}
+      note={`${swarm.source === "sim" ? "from simulation (make sim)" : "live"}${swarm.seed != null ? `, seed ${swarm.seed}` : ""}, ${pts[0].tokens} tokens`}
     >
       <div className="mt-3 grid grid-cols-1 gap-6 sm:grid-cols-[1fr_auto]">
         <figure>
@@ -166,15 +167,19 @@ export function RacePanel({ race }: { race: RaceStats | null }) {
   const [hover, setHover] = useState<string | null>(null);
   if (!race || race.matchers.length === 0) {
     return (
-      <Panel title="Race: co-located vs control matcher">
-        <p className="mt-3 text-xs text-[#898781]">No race data yet. Run <code className="font-mono">make race</code>.</p>
+      <Panel title="Race: who submits the batch">
+        <p className="mt-3 text-xs text-[#898781]">No race data yet. Run <code className="font-mono">make race3</code>.</p>
       </Panel>
     );
   }
-  // Fixed identity: co-located matcher is slot 1, control is slot 2.
-  const ms = [...race.matchers].sort((a, b) => Number(b.colocated) - Number(a.colocated));
-  const color = (i: number) => (i === 0 ? S1 : S2);
-  const label = (m: (typeof ms)[number]) => `${shortAgent(m.account)} · shard ${m.shard}${m.colocated ? " (Verifier's)" : ""}`;
+  // Order as served by the matcher (stable identity per slot).
+  const ms = race.matchers;
+  const color = (i: number) => [S1, S2, S3][i % 3];
+  const signsAsVerifier = (m: (typeof ms)[number]) => / \(signs as /.test(m.account);
+  const label = (m: (typeof ms)[number]) =>
+    signsAsVerifier(m)
+      ? `signs as the Verifier (delegated key) · shard ${m.shard}`
+      : `${shortAgent(m.account.split(" ")[0])} · shard ${m.shard}${m.colocated ? " (Verifier's)" : ""}`;
   const totalWins = ms.reduce((s, m) => s + m.wins, 0) || 1;
 
   const buckets = [...new Set(ms.flatMap((m) => Object.keys(m.blocksToExecHist)))].sort((a, b) => +a - +b);
@@ -184,7 +189,7 @@ export function RacePanel({ race }: { race: RaceStats | null }) {
   const bw = Math.min(46, (gw * 0.7) / ms.length);
 
   return (
-    <Panel title="Race: co-located vs control matcher" note={`${race.rounds} contested rings`}>
+    <Panel title="Race: who submits the batch" note={`${race.rounds} contested rings · same rings, submitted at once`}>
       <div className="mt-3">
         <Legend items={ms.map((m, i) => ({ label: label(m), color: color(i) }))} />
       </div>

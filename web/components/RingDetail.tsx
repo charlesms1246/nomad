@@ -13,10 +13,10 @@ const STEPS: { key: Ring["status"]; label: string }[] = [
 
 export function TxLink({ state, hash, n = 8 }: { state: NomadState; hash: string | null; n?: number }) {
   if (!hash) return <span className="text-[#5c5b57]">—</span>;
-  if (state.meta.source === "mock") {
+  if (state.meta.source === "mock" || state.meta.source === "sim") {
     return (
-      <span className="font-mono text-[#c3c2b7]" title="Mock data: not a real transaction">
-        {shortHash(hash, n)} <span className="text-[10px] text-[#898781]">(mock)</span>
+      <span className="font-mono text-[#c3c2b7]" title="Mock or simulated data: not a real transaction">
+        {shortHash(hash, n)} <span className="text-[10px] text-[#898781]">({state.meta.source})</span>
       </span>
     );
   }
@@ -49,6 +49,7 @@ export default function RingDetail({ state, ix, ring, highlightSavings }: { stat
           </h2>
           <span className="text-xs text-[#898781]">
             k = {ring.k} · matcher {shortAgent(ring.matcher)}
+            {ring.txSigner ? ` · tx signed as ${ring.txSigner}` : ""}
           </span>
         </div>
 
@@ -84,7 +85,9 @@ export default function RingDetail({ state, ix, ring, highlightSavings }: { stat
             <span className="h-5 w-5 shrink-0" />
             <span className="w-10 text-[#898781]">fee</span>
             <span className="font-mono text-[13px] text-[#898781]">
-              matcher +{fmtAmt(ix, ring.matcherLeg.token, ring.matcherLeg.amt)} (positive-only leg, same batch)
+              {ring.matcherLeg.amt === "0"
+                ? "matcher fee: none (all surplus to the agents)"
+                : <>matcher +{fmtAmt(ix, ring.matcherLeg.token, ring.matcherLeg.amt)} (positive-only leg, same batch)</>}
             </span>
           </li>
         </ul>
@@ -98,6 +101,14 @@ export default function RingDetail({ state, ix, ring, highlightSavings }: { stat
           <dd className="text-right">
             <TxLink state={state} hash={ring.txHash} />
           </dd>
+          {ring.txSigner && (
+            <>
+              <dt className="text-[#898781]">Tx signer</dt>
+              <dd className="text-right font-mono text-[#f0efec]" title="Delegated function-call key on the Verifier, limited to execute_intents (as intents.near does on mainnet): a local receipt, executes in the inclusion block">
+                {ring.txSigner} (delegated key)
+              </dd>
+            </>
+          )}
           <dt className="text-[#898781]">Blocks to execute</dt>
           <dd className="text-right font-mono text-[#f0efec]">{ring.blocksToExec ?? "—"}</dd>
           <dt className="text-[#898781]">Gas burnt</dt>
@@ -113,7 +124,7 @@ export default function RingDetail({ state, ix, ring, highlightSavings }: { stat
         <div className="mt-3 grid grid-cols-2 gap-4">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-[#898781]">1Click spread</div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums text-[#ec835a]">{base ? `−${base.bps} bps` : "—"}</div>
+            <div className="mt-1 text-2xl font-semibold tabular-nums text-[#ec835a]">{base ? `−${Math.abs(base.bps)} bps` : "—"}</div>
             <div className="mt-1 text-[11px] text-[#898781]">{base ? `${base.pair}, mainnet dry quote, ${fmtTime(base.quotedAtMs)}` : "no quote yet"}</div>
           </div>
           <div>

@@ -58,6 +58,8 @@ export interface Ring {
   k: number; // number of agents (2..5)
   legs: Leg[]; // cyclic: legs[i].get == legs[i+1].give
   matcher: AccountId;
+  /** Signer of the execute_intents tx when it isn't the matcher (delegated Verifier key: 0-block path). */
+  txSigner?: AccountId;
   matcherLeg: { token: TokenId; amt: Amount }; // matcher's positive-only diff
   signedBy: AccountId[]; // agents whose leg is signed so far (UI lights these legs)
   surplusBps: number; // (S - 1) * 1e4, S = 1 / Π ρ
@@ -113,7 +115,9 @@ export interface Meta {
   board: AccountId;
   explorerTxUrl: string; // prefix, tx hash is appended: "https://testnet.nearblocks.io/txns/"
   generatedAtMs: number;
-  source: "live" | "mock"; // "mock" = UI fixture, not chain data
+  source: "live" | "mock" | "sim" | "recorded"; // mock = UI fixture; sim = `make sim-serve`; recorded = captured real testnet state
+  /** When source is "recorded": capture time of the snapshot (ms). */
+  recordedAt?: number;
   tokens: TokenMeta[];
   /** Headline 1Click baseline, re-measured on the day (IDEA §10.1). */
   baseline: { pair: string; bps: number; quotedAtMs: number } | null;

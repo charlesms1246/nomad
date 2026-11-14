@@ -143,6 +143,8 @@ export default function Dashboard() {
   const flash = frame ? frame.settledFlash : liveFlash;
   const showDeltas = frame ? ["settle", "savings", "outro"].includes(frame.phase) : liveFlash;
   const isMock = state.meta.source === "mock";
+  const isSim = state.meta.source === "sim";
+  const isRecorded = state.meta.source === "recorded";
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-5 py-6 lg:px-8">
@@ -159,7 +161,18 @@ export default function Dashboard() {
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
           <span className="rounded-full border border-[#fab219]/40 px-2.5 py-1 font-medium uppercase tracking-wide text-[#fab219]">NEAR testnet</span>
-          {isMock ? (
+          {isSim ? (
+            <span className="rounded-full border border-[#86b6ef]/50 bg-[#86b6ef]/10 px-2.5 py-1 font-medium uppercase tracking-wide text-[#86b6ef]" title="make sim-serve: simulated swarm, no chain">
+              Simulation
+            </span>
+          ) : isRecorded ? (
+            <span
+              className="rounded-full border border-[#86b6ef]/50 bg-[#86b6ef]/10 px-2.5 py-1 font-medium uppercase tracking-wide text-[#86b6ef]"
+              title="Real testnet state captured from a live run; tx links are real"
+            >
+              Recorded testnet data{state.meta.recordedAt ? ` · ${new Date(state.meta.recordedAt).toISOString().slice(0, 16).replace("T", " ")} UTC` : ""}
+            </span>
+          ) : isMock ? (
             <span
               className="rounded-full border border-[#ec835a]/50 bg-[#ec835a]/10 px-2.5 py-1 font-medium uppercase tracking-wide text-[#ec835a]"
               title={fallback ?? "No matcher configured; showing the UI fixture"}

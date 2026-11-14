@@ -1,11 +1,15 @@
 import { connection } from "next/server";
 import { buildMockState } from "@/lib/mock";
+import recorded from "@/lib/live-snapshot.json";
+import type { NomadState } from "@/lib/types";
 
 // Server-side proxy to the matcher API (apps/matcher, GET /api/state).
-// MATCHER_URL is a server env var, so the browser never talks to the matcher
-// directly (no CORS or mixed-content issues on Vercel).
-// With no MATCHER_URL, with ?mock=1, or when the matcher is unreachable, it
-// serves the UI fixture with meta.source = "mock", which the UI labels.
+// MATCHER_URL is a server env var, so the browser never talks to the matcher directly.
+// Fallback order: live matcher -> recorded real testnet state (lib/live-snapshot.json,
+// meta.source "recorded", real tx links) -> nothing else. ?mock=1 serves the UI fixture
+// (meta.source "mock") for local UI development.
+
+const recordedState = () => recorded as unknown as NomadState;
 
 export async function GET(req: Request) {
   await connection();
@@ -13,7 +17,9 @@ export async function GET(req: Request) {
   const forceMock = new URL(req.url).searchParams.get("mock") === "1";
   const headers = { "cache-control": "no-store" };
 
-  if (url && !forceMock) {
+  if (forceMock) return Response.json(buildMockState(), { headers: { ...headers, "x-nomad-source": "mock" } });
+
+  if (url) {
     try {
       const res = await fetch(`${url.replace(/\/$/, "")}/api/state`, {
         cache: "no-store",
@@ -22,14 +28,14 @@ export async function GET(req: Request) {
       if (res.ok) {
         return Response.json(await res.json(), { headers: { ...headers, "x-nomad-source": "live" } });
       }
-      return Response.json(buildMockState(), {
-        headers: { ...headers, "x-nomad-source": "mock", "x-nomad-fallback": `matcher HTTP ${res.status}` },
+      return Response.json(recordedState(), {
+        headers: { ...headers, "x-nomad-source": "recorded", "x-nomad-fallback": `matcher HTTP ${res.status}` },
       });
     } catch (e) {
-      return Response.json(buildMockState(), {
-        headers: { ...headers, "x-nomad-source": "mock", "x-nomad-fallback": `matcher unreachable: ${(e as Error).name}` },
+      return Response.json(recordedState(), {
+        headers: { ...headers, "x-nomad-source": "recorded", "x-nomad-fallback": `matcher unreachable: ${(e as Error).name}` },
       });
     }
   }
-  return Response.json(buildMockState(), { headers: { ...headers, "x-nomad-source": "mock" } });
+  return Response.json(recordedState(), { headers: { ...headers, "x-nomad-source": "recorded" } });
 }

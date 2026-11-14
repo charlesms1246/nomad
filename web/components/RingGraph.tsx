@@ -7,6 +7,8 @@ import { STATUS, fmtNum, shortAgent, shortHash, sym, toUnits, tokenColor, type T
 const W = 640;
 const C = W / 2;
 const R = 228;
+// Horizontal room for "wants X" labels of agents at 9 and 3 o'clock.
+const PAD = 70;
 
 interface Props {
   state: NomadState;
@@ -82,13 +84,16 @@ export default function RingGraph({ state, ix, ring, pair, flash, showDeltas, di
     };
     const s = trim(a, { x: qx, y: qy }, 34);
     const e = trim(b, { x: qx, y: qy }, 36);
-    return { d: `M ${s.x} ${s.y} Q ${qx} ${qy} ${e.x} ${e.y}`, mid: { x: 0.25 * s.x + 0.5 * qx + 0.25 * e.x, y: 0.25 * s.y + 0.5 * qy + 0.25 * e.y } };
+    // Label point at t = 0.3 along the curve (nearer the giver), so long legs' pills stay out of the centre.
+    const t = 0.3;
+    const at = (u: number) => ({ x: (1 - u) * (1 - u) * s.x + 2 * (1 - u) * u * qx + u * u * e.x, y: (1 - u) * (1 - u) * s.y + 2 * (1 - u) * u * qy + u * u * e.y });
+    return { d: `M ${s.x} ${s.y} Q ${qx} ${qy} ${e.x} ${e.y}`, mid: at(t) };
   };
 
   const st = ring ? statusLine(ring) : null;
 
   return (
-    <svg viewBox={`0 0 ${W} ${W}`} className="w-full h-auto select-none" role="img" aria-label="Agents on a circle; the active ring is highlighted">
+    <svg viewBox={`${-PAD} 0 ${W + 2 * PAD} ${W}`} className="w-full h-auto select-none" role="img" aria-label="Agents on a circle; the active ring is highlighted">
       <defs>
         {["#5c5b57", STATUS.good, STATUS.critical, ...state.meta.tokens.map((t) => tokenColor(ix, t.id))].map((c) => (
           <marker key={c} id={`arrow-${c.slice(1)}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -211,6 +216,8 @@ export default function RingGraph({ state, ix, ring, pair, flash, showDeltas, di
       {/* Center status */}
       {ring && st ? (
         <g transform={`translate(${C} ${C})`}>
+          {/* backdrop so ring edges and amount pills never run through the status text */}
+          <rect x={-150} y={-44} width={300} height={ring.txHash ? 108 : 64} rx={14} fill="#121211" fillOpacity={0.92} stroke="#2c2c2a" />
           <text textAnchor="middle" y={-14} className="text-[22px] font-semibold" fill={st.color}>
             {st.title}
           </text>

@@ -103,7 +103,7 @@ async function serve(swarm: SwarmStats) {
           verifierShard: null,
           board: "board.nomadswarm.testnet",
           explorerTxUrl: "https://testnet.nearblocks.io/txns/",
-          source: "mock",
+          source: "sim",
           tokens,
           baseline: { pair: "wNEAR->USDC", bps: BASELINE, quotedAtMs: Date.parse("2026-11-13T20:47:08Z") },
         },

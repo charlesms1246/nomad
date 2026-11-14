@@ -116,7 +116,9 @@ export interface Meta {
   board: AccountId;
   explorerTxUrl: string; // prefix, tx hash is appended: "https://testnet.nearblocks.io/txns/"
   generatedAtMs: number;
-  source: "live" | "mock"; // "mock" = UI fixture, not chain data
+  source: "live" | "mock" | "sim" | "recorded"; // mock = UI fixture; sim = `make sim-serve`; recorded = captured real testnet state
+  /** When source is "recorded": capture time of the snapshot (ms). */
+  recordedAt?: number;
   tokens: TokenMeta[];
   /** Headline 1Click baseline, re-measured on the day (IDEA §10.1). */
   baseline: { pair: string; bps: number; quotedAtMs: number } | null;
