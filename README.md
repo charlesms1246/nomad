@@ -1,4 +1,4 @@
-# Nomad: agents trade in rings, settled in one NEAR Intents call (NEAR HACKATHON 2026)
+# Nomad: permissionless on-chain coincidence of wants for NEAR Intents, any wallet (NEAR HACKATHON 2026)
 
 > Not related to the Nomad cross-chain bridge that was hacked in 2022. This is a different project with a different codebase.
 
@@ -17,11 +17,26 @@ Both print `"code_hash":"BtA1BEFNS619KkvXFsgcpQ21Tb5yMm32aaUkn7xNothk"` (checked
 
 ## What it is
 
-- AI agents post offers on a public board: "I give up to X of token A, and I want at least ρ of token B per unit."
-- Matchers look for **loops** of 2 to 5 offers (A wants B's token, B wants C's, C wants A's) where the limit rates leave a surplus after the Verifier fee.
-- Every agent checks and signs **only its own leg**, a NEP-413 `token_diff`. One `execute_intents` call on the Verifier settles the whole loop: every leg settles or none does.
-- The matcher's fee is its own positive-only intent inside the same batch, so it can take only the surplus. **Matchers compete for each agent's signature, and the agent signs the proposal that pays it best** (a per-offer auction, `make fee-race`).
-- A matcher is a solver by another name, and it takes a cut. See [What the matcher takes](#what-the-matcher-takes-and-what-agents-save).
+Agents that hold different tokens trade in **rings** (A wants B's token, B wants C's, C wants A's). Each agent signs only its own leg, and one `execute_intents` call on the NEAR Intents Verifier settles the whole ring: every leg settles or none does.
+
+**On-chain closing (v2, `contracts/rings` at `rings.nomadswarm.testnet`).**
+- Anyone can propose a ring with `propose_ring`. The contract checks that it is a cycle and that every token nets to zero after the Verifier fee.
+- Each agent attaches its signed leg with `attach_leg`. A leg is one `token_diff` plus a small tip `transfer`, signed in any of three wallet standards the Verifier accepts: `nep413` (NEAR), `erc191` (Ethereum `personal_sign`) or `raw_ed25519` (Solana-style).
+- **Any account can call `close_ring`.** The contract makes one cross-contract `execute_intents` call and pays the agents' tips to whoever closed the ring.
+- There is no matcher leg, and no allowlist for proposing or closing.
+- The contract keeps reputation counters (ERC-8004-style: rings settled, rings closed, legs in failed closes).
+- EVM users can also submit an EIP-712 order (ERC-7683 earlier-draft `GaslessCrossChainOrder`). The contract checks it with `ecrecover`.
+- **Measured:** a stranger account (`k4`) closed a ring whose three legs were signed in **three different standards**: [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR). Details are in [Measurements](#measurements).
+
+**Mandates (v2, `contracts/mandate`, in progress).** An owner sets limits on chain. The contract then requests a leg signature from NEAR's MPC signer (Chain Signatures, `v1.signer-prod.testnet`) for an `erc191` leg.
+- K-c passed: the MPC-signed leg was accepted by `simulate_intents`.
+- It has not settled in a ring yet.
+
+**Off-chain proposer mode (v1, `apps/matcher`).** Matchers find rings off chain and send proposals to agents over a websocket bus.
+- Each agent checks a proposal with `legCheck` and signs it. The matcher adds its fee leg and submits the batch.
+- Matchers compete on their cut: each agent runs a short auction per offer and signs only the best-paying proposal (`make fee-race`).
+- This mode produced the 36-minute live run and the races below.
+- A v1 matcher is a solver by another name, and it takes a cut. See [What the matcher takes](#what-the-matcher-takes-and-what-agents-save).
 
 ## Closest work, and what is actually different
 
@@ -34,6 +49,20 @@ Both print `"code_hash":"BtA1BEFNS619KkvXFsgcpQ21Tb5yMm32aaUkn7xNothk"` (checked
 
 Everything in that list, Nomad also does or now does. Fee competition between matchers (`make fee-race`) and our mainnet proof (`make mainnet-proof`) were added after Kula's, and they catch up with it rather than go beyond it.
 
+| | Kula | Nomad |
+|---|---|---|
+| Came first | **Yes** (rings settled 2026-11-09) | No |
+| Who finds rings | Off-chain scouts | v1: off-chain matchers. v2: anyone calls `propose_ring` on the contract |
+| Who submits the settlement | The scout that won, from its own account | v1: the matcher. v2: **any account** calls `close_ring`; the contract makes the `execute_intents` call and pays the closer the agents' tips |
+| Fee competition | Yes: scouts compete on tip | v1: yes (`make fee-race`, 3 matchers we run). v2: tips are set by the agents; there's no matcher cut |
+| Wallet standards in a ring | NEP-413 | `nep413`, `erc191` and `raw_ed25519` in **one** settled ring; EIP-712 orders via `ecrecover` (unit-tested) |
+| Mandates | Off chain: NEAR AI reads plain-English orders | Off chain: `legCheck`, optional LLM margin. On chain (in progress): `contracts/mandate` gets MPC signatures for legs; one leg passed `simulate_intents` |
+| Reputation | Not mentioned in its README | On-chain counters in `contracts/rings` (rings settled, rings closed, failed closes) |
+| 1Click floor / fallback | Real quote floors, and the fallback is taken | Quotes as the baseline; the fallback is refused on testnet by design |
+| Read-only mainnet `simulate_intents` proof | Yes | Yes (`make mainnet-proof`) |
+| Real-flow demand study | **Yes** (0.0% / 0.2% / 11.7% of volume within 5 min / 1 h / 1 day) | No |
+| Verifier on testnet | A copy with `intents.near`'s code hash, deployed by someone else, fee 0 | Our deployment with `intents.near`'s code hash, fee 1 pip, FullAccess key deleted |
+
 Other prior work:
 - **CoW Protocol** ([coincidence of wants](https://docs.cow.fi/overview/coincidence-of-wants)). Ring trades are an established idea. Solvers there settle them through CoW's own contract.
 - **Multi-signer cyclic batches already settle on mainnet `intents.near`.** In tx [`EEdfCacw…`](https://nearblocks.io/txns/EEdfCacwDJvoNmbFPbHep1KJ4pC2EtZoPFGTHxmZoiWs), signed by `intents.near`, three NEP-413 `token_diff` payloads (`solver-multichain-asset.near`, `solver-priv-liq.near` and a user's implicit account) form a USDT(BSC) → USDT(ETH) → PEPE → USDT(BSC) loop in one `execute_intents`. We read this on chain on 2026-11-14.
@@ -41,7 +70,7 @@ Other prior work:
 
 What we claim as different, and nothing more:
 1. **One-of-N commitments through a shared nonce.**
-   - An agent signs every competing proposal for one offer, including different rings from different matchers, with **the same Verifier nonce**. At most one of them can ever execute, whatever the agent's balance.
+   - Every leg an agent signs for one offer uses **the same Verifier nonce**: competing proposals in v1, or a leg attached to one ring while another is still open. At most one of them can ever execute, whatever the agent's balance. (Since the fee auction, a v1 agent signs only the best proposal within its auction window, so the shared nonce covers proposals that arrive across windows and rings from different proposers.)
    - Evidence: in the 3-way race, all 54 losing batches ([race3.json](docs/measurements/race3.json)) failed with `nonce was already used`. A failed `execute_intents` changes no balance, and attack A7 checks the balances explicitly ([attacks.ts](scripts/attacks.ts)).
    - What we checked first:
      - Kula's README and RULES.md use the nonce only for replay ("the Verifier's nonce stops the second one"). They avoid double fills by having each member sign only the single best proposal.
@@ -51,7 +80,8 @@ What we claim as different, and nothing more:
 2. **Standing agent inventories with a 1Click fallback.**
    - Agents keep their balances inside the Verifier between rings, instead of bringing one swap at a time.
    - An offer that finds no ring falls back to 1Click. On testnet that fallback is modelled only: the sim counts it, and live execution is refused because 1Click is mainnet-only.
-3. **A measured latency finding, offered as research.** On NEAR, only a transaction whose signer *is* the Verifier executes in its inclusion block. Shard placement doesn't help. See the [research appendix](#research-appendix).
+3. **Permissionless contract closing across wallet standards (v2).** A stranger closed rings through `contracts/rings` and was paid the tips, with no matcher leg and no allowlist. One of those rings mixed `nep413`, `erc191` and `raw_ed25519` legs. As far as we know, Kula settles through a scout's own transaction with NEP-413 legs.
+4. **A measured latency finding, offered as research.** On NEAR, only a transaction whose signer *is* the Verifier executes in its inclusion block. Shard placement doesn't help. See the [research appendix](#research-appendix).
 
 ## Prerequisites
 
@@ -69,7 +99,7 @@ Output below was captured from this repo on 2026-11-14.
 | 1 | `make sim` | `sim backend=ledger (7 ms) agents=20 tokens=5 seed=1 rounds=30: settled 11 rings (k=2:5 k=3:3 k=4:2 k=5:1), cleared 47% of offers by rings (18/38), 53% fell back to 1Click; agents' mean rate vs mid -18.3 bps vs 1Click baseline -49 bps => saved 30.7 bps; failed rings 0`. A sweep over 3/5/8 tokens × 10–200 agents follows, plus `out/clearing-rate.svg` and `out/ring-lengths.svg`. `SIM_BACKEND=model make sim` runs the same sim on the Verifier model with real ed25519 signatures. The "saved" figure is against a 1Click quote that includes its 20 bps keyless app fee |
 | 2 | `make dry-run` | `ring-3.json: simulate_intents on intents.nomadswarm.testnet: 4 intents_executed (3 agents + matcher)`, then the same for ring-4 (5) and ring-5 (6). This is a read-only call to our testnet Verifier with committed signed fixtures |
 | 3 | `make mainnet-proof` | `ring (3 agents), leg 1 first: insufficient balance or overflow` (and the same for legs 2 and 3), then `control: corrupted signature: invalid signature` and `control: zero salt: invalid salt`. This is read-only `simulate_intents` on **mainnet `intents.near`** |
-| 4 | `make test` | Each TypeScript package reports `Tests N passed`. Then the board's Rust tests report `test result: ok` |
+| 4 | `make test` | Each TypeScript package reports `Tests N passed`. Then the board's Rust tests report `test result: ok`. The v2 contracts test separately: `cd contracts/rings && cargo test` (16 passed) and `cd contracts/mandate && cargo test` (14 passed) |
 | 5 | `cd web && npm install && npm run dev` | The UI at http://localhost:3000. With no reachable `MATCHER_URL`, it shows a recorded real testnet state (a 3-way race capture, with real tx links) labelled **Recorded testnet data · 2026-11-13 23:53 UTC**. `make sim-serve` plus `make ui` shows a running simulation, labelled **Simulation**. `MATCHER_URL=http://localhost:1 make ui-check` prints `ui-check: source=recorded agents=12 rings=18 settled=6` |
 | 6 | Testnet proof | The tx links under [Deployments](#deployments) |
 
@@ -88,7 +118,7 @@ What `make mainnet-proof` shows, and no more:
 | Ring search, fee-correct sizing, surplus split | [packages/ringfinder/src/index.ts](packages/ringfinder/src/index.ts) | [ringfinder.test.ts](packages/ringfinder/test/ringfinder.test.ts) (property tests) |
 | An agent never signs outside its offer | [apps/agent/src/legCheck.ts](apps/agent/src/legCheck.ts) | [legCheck.test.ts](apps/agent/test/legCheck.test.ts); [legCheck.prop.test.ts](apps/agent/test/legCheck.prop.test.ts) (fast-check, through the real signing path; each of the 5 guards was removed in turn and the tests caught it) |
 | Agent strategies | [apps/agent/src/strategies.ts](apps/agent/src/strategies.ts) | [strategies.test.ts](apps/agent/test/strategies.test.ts) |
-| Matcher loop: propose → collect → simulate → execute | [apps/matcher/src/matcher.ts](apps/matcher/src/matcher.ts) | [matcher.test.ts](apps/matcher/test/matcher.test.ts) (end to end); live rings in [MEASUREMENTS](docs/MEASUREMENTS.md#36-minute-live-run-submit_asverifier-auto_fund10-make-live) |
+| v1 matcher loop (off-chain proposer mode): propose → collect → simulate → execute | [apps/matcher/src/matcher.ts](apps/matcher/src/matcher.ts) | [matcher.test.ts](apps/matcher/test/matcher.test.ts) (end to end); live rings in [MEASUREMENTS](docs/MEASUREMENTS.md#36-minute-live-run-submit_asverifier-auto_fund10-make-live) |
 | NEP-413 signing, versioned nonce, Verifier client | [packages/intents/src](packages/intents/src) | [intents.test.ts](packages/intents/test/intents.test.ts) (golden vector, cross-checked against `node:crypto`); K1–K8 on testnet |
 | Our testnet Verifier runs mainnet's exact bytes | [scripts/verifier-mainnet-bytes.ts](scripts/verifier-mainnet-bytes.ts) (reads the code from mainnet with `view_code`, checks the hash, deploys). [contracts/verifier/build.sh](contracts/verifier/build.sh) and [deploy.ts](contracts/verifier/deploy.ts) are how we first built and deployed it, from near/intents `16d04f6` | Code hash `BtA1BEFN…` on both networks; [MEASUREMENTS § Verifier verifiability](docs/MEASUREMENTS.md#verifier-verifiability-2026-11-14) |
 | Read-only mainnet proof | [scripts/mainnet-simulate.ts](scripts/mainnet-simulate.ts) | `make mainnet-proof`; [mainnet-simulate.json](docs/measurements/mainnet-simulate.json) |
@@ -101,6 +131,10 @@ What `make mainnet-proof` shows, and no more:
 | (Research appendix) Delegated relayer key and 3-way race | [apps/matcher/src/cli-relayer-key.ts](apps/matcher/src/cli-relayer-key.ts), `SUBMIT_AS=verifier` in [cli-live.ts](apps/matcher/src/cli-live.ts) | `make relayer-key && make race3`; [race3.json](docs/measurements/race3.json) |
 | (Research appendix) Shard tool `colo` (CLI, library, MCP server) | [packages/colo/src](packages/colo/src) | [packages/colo/test](packages/colo/test) |
 | Agent MCP server `nomad-mcp`: 6 tools (`nomad_tokens`, `nomad_balance`, `nomad_offer`, `nomad_cancel`, `nomad_status`, `nomad_leaderboard`) | [apps/agent/src/mcp.ts](apps/agent/src/mcp.ts) | No automated test |
+| v2 on-chain closer: `propose_ring`, `attach_leg`, permissionless `close_ring` (cross-contract `execute_intents`, tips paid to the closer with `mt_transfer`), reputation counters, ERC-7683 order ingress | [contracts/rings/src](contracts/rings/src) | `cd contracts/rings && cargo test` (16 tests, including the ERC-7683 golden vector and `ecrecover`); on chain: [scripts/rings-e2e.ts](scripts/rings-e2e.ts), [scripts/rings-multiwallet.ts](scripts/rings-multiwallet.ts) |
+| Wallet standards: `erc191` and `raw_ed25519` signers | [packages/intents/src/standards.ts](packages/intents/src/standards.ts) | [standards.test.ts](packages/intents/test/standards.test.ts) (vectors from near/intents and web3.js); K-a on chain ([scripts/k-a-multiwallet.ts](scripts/k-a-multiwallet.ts)) |
+| ERC-7683 (earlier draft) `GaslessCrossChainOrder`, EIP-712 digest and signature | [packages/intents/src/erc7683.ts](packages/intents/src/erc7683.ts) | [erc7683.test.ts](packages/intents/test/erc7683.test.ts); golden vector [erc7683-vector.json](packages/intents/test/fixtures/erc7683-vector.json), checked against viem 2.57.19 and loaded by the Rust tests |
+| On-chain mandates with MPC signatures (in progress) | [contracts/mandate/src](contracts/mandate/src) | `cd contracts/mandate && cargo test` (14 tests); K-c ([scripts/k-c-mandate.ts](scripts/k-c-mandate.ts)) |
 | Offer board (rules in [RULES.md](RULES.md)) | [contracts/board/src/lib.rs](contracts/board/src/lib.rs) | `make test-rust` (40 unit tests); `make test-sandbox` (near-workspaces, needs cargo-near) |
 | 1Click baseline and guarded fallback | [packages/oneclick/src](packages/oneclick/src) | [packages/oneclick/test](packages/oneclick/test). The fallback refuses to run on testnet by design: `1Click fallback is mainnet-only; refusing on testnet` ([fallback.ts](packages/oneclick/src/fallback.ts)) |
 | LLM mode (NEAR AI Cloud sets an agent's margin; `legCheck` still decides every signature) | [apps/agent/src/llm.ts](apps/agent/src/llm.ts) | [llm.test.ts](apps/agent/test/llm.test.ts) against a mocked API, including clamping to [0, 5%]. Not run against the live API: it needs `LLM=1 NEARAI_API_KEY=…`, and we had no key |
@@ -113,11 +147,13 @@ What `make mainnet-proof` shows, and no more:
 
 | Part | Real | Simulated |
 |---|---|---|
-| Settlement | `execute_intents` on our testnet Verifier, real NEP-413 signatures, real testnet NEP-141 tokens | `make sim` uses an in-process ledger or the Verifier model, with no chain |
+| Settlement | `execute_intents` on our testnet Verifier, with real signatures (`nep413`, `erc191`, `raw_ed25519`) and real testnet NEP-141 tokens. Submitted by the v1 matcher, or by the rings contract when a stranger closes | `make sim` uses an in-process ledger or the Verifier model, with no chain |
 | Tokens | `wnear`, `usdc`, `usdt`, `btc`, `zec` `.nomadswarm.testnet` | They have no market value |
 | Prices and the 1Click baseline | Live mainnet 1Click dry quotes (read-only, no funds) | The sim uses one fixed baseline quote (−49 bps on 2026-11-13) |
 | Agents | `a01`–`a12.nomadswarm.testnet`, each with its own Verifier key | Sim agents are in-process |
 | Fallback execution through 1Click | Refused on testnet by design (1Click is mainnet-only) | Quotes only |
+| On-chain mandates | The MPC signer (`v1.signer-prod.testnet`) signed a leg requested by `contracts/mandate`, and `simulate_intents` accepted it | That leg has not settled in a ring |
+| ERC-7683 orders | `ecrecover` in the contract matches our golden vector (unit tests) | Not yet exercised by an EVM wallet on chain |
 | LLM mode | Coded and unit-tested against a mocked API | Not run against the live NEAR AI Cloud API |
 | UI | Reads the matcher's `/api/state` (badge LIVE). With no reachable matcher, a recorded real testnet state from 2026-11-13 23:53 UTC ([web/lib/live-snapshot.json](web/lib/live-snapshot.json)), labelled as recorded | With `make sim-serve`, simulated state labelled Simulation. `?mock=1` serves an invented layout fixture for UI development only |
 
@@ -132,6 +168,9 @@ What `make mainnet-proof` shows, and no more:
 - **Sub-accounts.** One per agent, each registering its intents key with `add_public_key` (K4).
 
 ## What the matcher takes, and what agents save
+
+This section is about v1 (off-chain proposer mode). In v2 there is no matcher leg: each agent pays a tip it signed itself (0.1% of its give in the runs above) to whoever closes the ring.
+
 
 - **The matcher's take.** In live mode each matcher keeps a share φ of the ring's surplus. The default is φ = 0.2 unless `RACE_PHI` is set.
   - In the 36-minute live run (φ = 0.2, one matcher), the median take was **61 bps of the closing leg**, the leg the matcher is paid from. That is about **15 bps of total ring value** if you spread it over the k legs (`matcherShareBps` in [live-30min.json](docs/measurements/live-30min.json), defined in [types.ts](apps/matcher/src/types.ts)).
@@ -152,6 +191,20 @@ All of these are in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md), with tx hashes
 - **Differential test:** 500/500 random batches agree between `packages/verifier-model` and testnet `simulate_intents` (seed 1 with N = 200, seed 7 with N = 300).
 - **Attacks on chain:** all 10 rows pass. Each attack fails with the expected Verifier error and moves no balance.
 - **One-of-N commitments:** in the 3-way race, all 54 losing batches failed with `nonce was already used` ([race3.json](docs/measurements/race3.json)).
+- **v2, a stranger closes a ring** (K-b, [rings-e2e.json](docs/measurements/rings-e2e.json)):
+  - `intents-matcher-1` proposed a 3-agent ring (a01 ZEC → a02 USDC → a03 wNEAR → a01) on `rings.nomadswarm.testnet`, and each agent attached its signed leg.
+  - `k4.nomadswarm.testnet`, which had no part in the ring, called `close_ring` [`85Emngj6…`](https://testnet.nearblocks.io/txns/85Emngj6B4q8EqSjAWShfPbMYSfrGstE9RnYJwrhVQdc). One cross-contract `execute_intents` settled the ring.
+  - The closer received exactly the three tips (0.1% of each give).
+  - Reputation counters were updated.
+- **v2, three wallet standards in one ring** ([rings-multiwallet.json](docs/measurements/rings-multiwallet.json)):
+  - `a01` (`nep413`), a fresh Ethereum key (`erc191`, implicit `0x…` account) and a fresh ed25519 key (`raw_ed25519`, implicit hex account) attached legs to one ring.
+  - `k4` closed it [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR).
+  - Each wallet gave 1,000,000 + a 1,000 tip and received 999,999. The closer received the three tips.
+  - The same three standards also settled directly through `execute_intents` in K-a ([`EpaBq8dN…`](https://testnet.nearblocks.io/txns/EpaBq8dN8WhojK4eo1fqZ7XRBMXuGBdjv4G8bu5r379x)).
+- **v2, MPC mandate** (K-c, [mandate.json](docs/measurements/mandate.json)):
+  - `mandate.nomadswarm.testnet` requested an `erc191` leg signature from `v1.signer-prod.testnet` for its derived address `0x9915…bf9b` [`FnMcqifQ…`](https://testnet.nearblocks.io/txns/FnMcqifQZEMRrSjnK5xY7j5nrNzuwvx2MxfBQt3FPtCY), which took 8.8 s.
+  - `simulate_intents` accepted the signed leg against a counter-leg.
+  - It was not settled.
 - **Read-only mainnet proof:** `make mainnet-proof`, described [above](#try-it-no-keys-no-funds).
 - **36-minute live run** (2026-11-14, 00:35–01:11 UTC, 12 agents, one matcher at φ = 0.2, `SUBMIT_AS=verifier AUTO_FUND=10 make live`; [live-30min.json](docs/measurements/live-30min.json)):
   - **27 rings settled, 0 failed** (k = 3: 4, k = 4: 17, k = 5: 6), each in one `execute_intents` call;
@@ -172,7 +225,9 @@ All on NEAR testnet. Explorer: `https://testnet.nearblocks.io/txns/<hash>`.
 | Verifier (mainnet `intents.near`'s exact wasm, code hash `BtA1BEFN…`) | `intents.nomadswarm.testnet` | Mainnet bytes deployed: [`61ydnqMM…`](https://testnet.nearblocks.io/txns/61ydnqMMonrzThZhgVVoNdRkPsm2o8HMroLjTAMjdtFi). FullAccess key deleted: [`4EfJrpuF…`](https://testnet.nearblocks.io/txns/4EfJrpuFRMZKUi2Kv32mMyq29XieGr9uoRc7qtiuCkvq). Original deploy + `new` of our own build: [`B2ZwQmRV…`](https://testnet.nearblocks.io/txns/B2ZwQmRVh2MmWcZzRkchHoCkXcUrPhqxPiaeL3ZehjAZ). A live ring after the swap: [`2GNqc4Jv…`](https://testnet.nearblocks.io/txns/2GNqc4JvWGU6H4jMU8wnRwNWM2kbetHf4i78X8wKu4pH) |
 | Verifier fee collector (1 pip) | `fees.nomadswarm.testnet` | A balance inside the Verifier only; no on-chain account is needed (K6) |
 | Test tokens | `wnear`, `usdc`, `usdt`, `btc`, `zec` `.nomadswarm.testnet` | [config/testnet.json](config/testnet.json) |
-| Offer board | `board.nomadswarm.testnet` | Create + deploy + `new`: [`qrQaozvX…`](https://testnet.nearblocks.io/txns/qrQaozvXXHwSMUkLfmWwzNQhaoNUZjW4pWpfD5mVxDX) ([scripts/deploy-board.mjs](scripts/deploy-board.mjs)); `add_matcher`: [`9xFg3fgs…`](https://testnet.nearblocks.io/txns/9xFg3fgsTMbxUKfGixus5fKoHx7wLBMgTiXsA3FuhyiN), [`7EvwrQXX…`](https://testnet.nearblocks.io/txns/7EvwrQXXXS78PW8cQ5N4xB5wzF4r6hffHUGXi93YLCqV) |
+| v2 rings contract | `rings.nomadswarm.testnet` | Deploy [`2oibk3eW…`](https://testnet.nearblocks.io/txns/2oibk3eWFUpRa41LYZsVWbt2wYvDgjM1jc3AttGsi5Nk); stranger closes [`85Emngj6…`](https://testnet.nearblocks.io/txns/85Emngj6B4q8EqSjAWShfPbMYSfrGstE9RnYJwrhVQdc), [`GALT4S7B…`](https://testnet.nearblocks.io/txns/GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR) |
+| v2 mandate contract | `mandate.nomadswarm.testnet` | Deploy [`APaeBU6Z…`](https://testnet.nearblocks.io/txns/APaeBU6ZkLpWzoWN16yz5ELZeuY6FWV9sVLkqEMRHdzw); MPC leg request [`FnMcqifQ…`](https://testnet.nearblocks.io/txns/FnMcqifQZEMRrSjnK5xY7j5nrNzuwvx2MxfBQt3FPtCY) |
+| Offer board (v1) | `board.nomadswarm.testnet` | Create + deploy + `new`: [`qrQaozvX…`](https://testnet.nearblocks.io/txns/qrQaozvXXHwSMUkLfmWwzNQhaoNUZjW4pWpfD5mVxDX) ([scripts/deploy-board.mjs](scripts/deploy-board.mjs)); `add_matcher`: [`9xFg3fgs…`](https://testnet.nearblocks.io/txns/9xFg3fgsTMbxUKfGixus5fKoHx7wLBMgTiXsA3FuhyiN), [`7EvwrQXX…`](https://testnet.nearblocks.io/txns/7EvwrQXXXS78PW8cQ5N4xB5wzF4r6hffHUGXi93YLCqV) |
 | Matcher, signing as the Verifier (relayer key, `execute_intents` only) | `intents-matcher-1.nomadswarm.testnet` | Relayer key `AddKey`: [`EytNTDhc…`](https://testnet.nearblocks.io/txns/EytNTDhc8KSSJ6XeT8CE2maSdNxwG3vkF1kfRuBRtUsg). 3-way race winner: [`B3nwWbx8…`](https://testnet.nearblocks.io/txns/B3nwWbx8dptDiVobQpfuaq1h9xVrDh6gXyp9iAVTyKPg) (0 blocks) |
 | Matcher on the Verifier's shard (7) | `intents-matcher.nomadswarm.testnet` | Created [`3DNE9SS8…`](https://testnet.nearblocks.io/txns/3DNE9SS8LoDCkpK8sZZX7eRspBsS88y6VMySv73h5yde); [`DqhyqX6n…`](https://testnet.nearblocks.io/txns/DqhyqX6n2aG735hN51HSbSA13xraqP52JKGnZrs19GJ5) (lost the race, 1 block) |
 | Matcher on another shard (4) | `matcher.nomadswarm.testnet` | Created [`5jFWwnWS…`](https://testnet.nearblocks.io/txns/5jFWwnWSYSNLJffkY1kYZjUj5HTpePmo1FJRfCpspUyM); [`3H8CPxrV…`](https://testnet.nearblocks.io/txns/3H8CPxrVrTWP2uu2yqgpVdTrj928rDqM5kFdg33PLWKi) (lost the race, 1 block) |
@@ -191,13 +246,15 @@ Ring settlements:
 - The contract's own access control still names `nomadswarm.testnet` as super-admin, with the roles `Upgrader`, `RelayerKeysManager` and `SaltManager`. So the team can still upgrade the code, manage relayer keys and rotate salts through the contract.
 - This is the same model as mainnet, where the `intents.near` DAO holds those roles; here the holder is our team.
 
+**Who controls the v2 contracts.** `rings.nomadswarm.testnet` and `mandate.nomadswarm.testnet` still have FullAccess keys held by the team, so we can redeploy them. The rings contract's owner can change its fee setting and EIP-712 chain id (`set_fee_pips`, `set_chain_id`). Proposing, attaching and closing need no permission. Tips pass through the contract's own Verifier balance on their way to the closer.
+
 ## Threat model and known limits
 
 See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md). In short:
 - the matcher can take only what is left after every agent's signed amount (A2);
 - a ring with an unfunded or altered leg fails as a whole (A1, A3);
 - a leaked agent key loses that agent's inventory;
-- the team controls the testnet Verifier through its admin roles (see Deployments).
+- the team controls the testnet Verifier through its admin roles, and the v2 contracts through FullAccess keys (see Deployments).
 
 Only assets held inside the Verifier can be in a ring.
 
@@ -252,7 +309,8 @@ Details are in [docs/PRIOR_ART.md](docs/PRIOR_ART.md).
   - `ws` (agent bus);
   - `@modelcontextprotocol/sdk` and `zod` (MCP servers);
   - `fast-check` and `vitest` (tests);
-  - `near-sdk` and `near-workspaces` (board contract and its sandbox test);
+  - `near-sdk` and `near-workspaces` (board, rings and mandate contracts; the board's sandbox test);
+  - NEAR Chain Signatures (`v1.signer-prod.testnet`) for mandate signatures;
   - Next.js and Tailwind CSS (`web/`).
 - There is no sibling project.
 
