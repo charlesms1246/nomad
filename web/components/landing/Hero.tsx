@@ -24,21 +24,24 @@ export default function Hero() {
   return (
     <section className="relative flex min-h-[100svh] w-full flex-col items-center justify-center px-5 pb-16 pt-24 sm:px-8">
       <div className="flex max-w-3xl flex-col items-center gap-5 text-center">
-        <motion.h1
-          initial={from({ opacity: 0, y: 80, filter: "blur(16px)", scale: 0.9 })}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)", scale: 1 }}
-          transition={{ duration: 1, delay: 0.3, ease }}
-          className="motion-static font-pixel select-none text-[4.5rem] leading-none tracking-tight text-[#f0efec] sm:text-8xl lg:text-9xl"
-        >
-          NOMAD<span className="text-[var(--accent-color)]">.</span>
-        </motion.h1>
+        {/* inline-flex column: the divider takes exactly the wordmark's width */}
+        <div className="inline-flex flex-col items-stretch gap-5">
+          <motion.h1
+            initial={from({ opacity: 0, y: 80, filter: "blur(16px)", scale: 0.9 })}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)", scale: 1 }}
+            transition={{ duration: 1, delay: 0.3, ease }}
+            className="motion-static font-pixel select-none text-[clamp(4.25rem,10vw,10.5rem)] leading-none tracking-tight text-[#f0efec]"
+          >
+            NOMAD<span className="text-[var(--accent-color)]">.</span>
+          </motion.h1>
 
-        <motion.div
-          initial={from({ scaleX: 0 })}
-          animate={{ scaleX: 1 }}
-          transition={{ duration: 1, delay: 0.9, ease }}
-          className="motion-static my-1 w-full max-w-md origin-left border-t-2 border-[#f0efec]"
-        />
+          <motion.div
+            initial={from({ scaleX: 0 })}
+            animate={{ scaleX: 1 }}
+            transition={{ duration: 1, delay: 0.9, ease }}
+            className="motion-static my-1 w-full origin-left border-t-2 border-[#f0efec]"
+          />
+        </div>
 
         <motion.p
           initial={from({ opacity: 0, y: 20, filter: "blur(6px)" })}

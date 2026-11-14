@@ -53,7 +53,7 @@ function Acct({ id, className = "" }: { id: string; className?: string }) {
   );
 }
 
-function WalletBadge({ standard, agent, label }: { standard: string | null; agent: string; label?: string }) {
+export function WalletBadge({ standard, agent, label }: { standard: string | null; agent: string; label?: string }) {
   const w = { ...walletOf(standard, agent), ...(label ? { label } : {}) };
   const c = WALLET_COLOR[walletOf(standard, agent).label] ?? "#898781";
   return (

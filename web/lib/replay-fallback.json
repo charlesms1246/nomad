@@ -1,0 +1,124 @@
+{
+ "source": "recorded",
+ "ring": {
+  "id": "f5d3e16fca764b6f752ab5d3254b67fd",
+  "proposer": "intents-matcher-1.nomadswarm.testnet",
+  "legs": [
+   {
+    "agent": "a01.nomadswarm.testnet",
+    "give": "nep141:usdc.nomadswarm.testnet",
+    "give_amt": "1000000",
+    "get": "nep141:usdt.nomadswarm.testnet",
+    "get_amt": "999999",
+    "tip": {
+     "token": "nep141:usdc.nomadswarm.testnet",
+     "amt": "1000"
+    }
+   },
+   {
+    "agent": "0x810d90fd895e3ea7d8f6b33da6bf1fcbf32bf371",
+    "give": "nep141:usdt.nomadswarm.testnet",
+    "give_amt": "1000000",
+    "get": "nep141:zec.nomadswarm.testnet",
+    "get_amt": "999999",
+    "tip": {
+     "token": "nep141:usdt.nomadswarm.testnet",
+     "amt": "1000"
+    }
+   },
+   {
+    "agent": "045329b6b59d6ceb452f58c3fd77806e7871d9873ba8bdfc12f942dc818966c2",
+    "give": "nep141:zec.nomadswarm.testnet",
+    "give_amt": "1000000",
+    "get": "nep141:usdc.nomadswarm.testnet",
+    "get_amt": "999999",
+    "tip": {
+     "token": "nep141:zec.nomadswarm.testnet",
+     "amt": "1000"
+    }
+   }
+  ],
+  "deadline_ms": 1794667986812,
+  "signed": [
+   "(signed)",
+   "(signed)",
+   "(signed)"
+  ],
+  "standards": [
+   "nep413",
+   "erc191",
+   "raw_ed25519"
+  ],
+  "status": "Settled",
+  "closer": "k4.nomadswarm.testnet",
+  "close_attempts": 1,
+  "created_ms": 1794667388342,
+  "settled_ms": 1794667404625
+ },
+ "proposeTx": "tr5tYj35gx5QJTWeF7r5XwbvFhoHs8Erdw5yUnY6ZVD",
+ "attach": [
+  {
+   "tx": "J4B9pnprd2pCLw7fCZ6F2VgcmZGuuXAm8FM8KJdWjmdQ",
+   "relayedBy": "a01.nomadswarm.testnet"
+  },
+  {
+   "tx": "4ja94VwdkaAfiWL4cxUD9MfP2YHZNVqQbW3qWzWcwdwr",
+   "relayedBy": "intents-matcher-1.nomadswarm.testnet"
+  },
+  {
+   "tx": "69HJF9xo9KMg7MPPqh33YgV6v1Qtnz951NmP67NMnLkS",
+   "relayedBy": "intents-matcher-1.nomadswarm.testnet"
+  }
+ ],
+ "close": {
+  "tx": "GALT4S7BiENHVroypTv1uQmanBAmhm9uSXbyHpShD7hR",
+  "closer": "k4.nomadswarm.testnet",
+  "stranger": true,
+  "includedHeight": 277670820,
+  "executedHeight": 277670822,
+  "success": true,
+  "status": "SuccessValue",
+  "signedStandards": [
+   "nep413",
+   "erc191",
+   "raw_ed25519"
+  ],
+  "allMatch": true
+ },
+ "tipsPaid": {
+  "nep141:usdc.nomadswarm.testnet": "1000",
+  "nep141:usdt.nomadswarm.testnet": "1000",
+  "nep141:zec.nomadswarm.testnet": "1000"
+ },
+ "reputation": {
+  "a01.nomadswarm.testnet": {
+   "agent_uri": null,
+   "registered_by": null,
+   "rings_settled": 3,
+   "rings_closed": 0,
+   "legs_in_failed_closes": 0
+  },
+  "0x810d90fd895e3ea7d8f6b33da6bf1fcbf32bf371": {
+   "agent_uri": null,
+   "registered_by": null,
+   "rings_settled": 1,
+   "rings_closed": 0,
+   "legs_in_failed_closes": 0
+  },
+  "045329b6b59d6ceb452f58c3fd77806e7871d9873ba8bdfc12f942dc818966c2": {
+   "agent_uri": null,
+   "registered_by": null,
+   "rings_settled": 1,
+   "rings_closed": 0,
+   "legs_in_failed_closes": 0
+  },
+  "k4.nomadswarm.testnet": {
+   "agent_uri": null,
+   "registered_by": null,
+   "rings_settled": 0,
+   "rings_closed": 4,
+   "legs_in_failed_closes": 0
+  }
+ },
+ "readAtMs": 1794673463526
+}

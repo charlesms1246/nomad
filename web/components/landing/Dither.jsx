@@ -99,11 +99,18 @@ void main() {
   // Nomad: push the wave field toward a loop. A gaussian band around ringRadius brightens
   // the noise, and inside the band the noise is sampled on a slowly rotating frame, so the
   // texture travels around the ring instead of drifting across the screen.
-  float r = length(uv);
-  float band = exp(-pow((r - ringRadius) / ringWidth, 2.0));
+  // Radius from the shorter viewport side (uv: height = 1, so the short side is min(1, aspect)),
+  // computed here from resolution so it always matches the drawn size; ringRadius is the cap.
+  float shortSide = min(1.0, resolution.x / resolution.y);
+  float R = shortSide < 0.75 ? 0.4 * shortSide : ringRadius;
+  float W = max(0.028, R * 0.2);
+  // On a phone the hero stack puts the wordmark above the middle: lift the loop to frame it.
+  vec2 c = shortSide < 0.75 ? vec2(0.0, 0.16) : vec2(0.0);
+  float r = length(uv - c);
+  float band = exp(-pow((r - R) / W, 2.0));
   float ang = time * 0.12 * band;
   mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
-  vec2 p = mix(uv, rot * uv, band);
+  vec2 p = mix(uv, rot * (uv - c) + c, band);
   float f = pattern(p);
   f *= mix(1.0, 0.28 + 1.35 * band, ringMix);
   if (enableMouseInteraction == 1) {
@@ -224,11 +231,8 @@ function DitheredWaves({
     if (res.x !== w || res.y !== h) {
       res.set(w, h);
     }
-    // Keep the loop inside the viewport: radius in units of viewport height, capped by width.
-    const aspect = size.width / Math.max(1, size.height);
-    const u = waveUniformsRef.current;
-    u.ringRadius.value = Math.min(0.34, 0.34 * aspect);
-    u.ringWidth.value = Math.max(0.045, u.ringRadius.value * 0.2);
+    // The ring's radius is derived in the shader from `resolution` (see main()); ringRadius is
+    // the desktop value it is capped at.
   }, [size, gl]);
 
   const prevColor = useRef([...waveColor]);

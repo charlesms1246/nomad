@@ -34,15 +34,19 @@ console.log(`ui-check: source=${d.meta.source} agents=${d.agents.length} rings=$
 if(!d.rings.length){console.error("ui-check: no rings in state");process.exit(1)}})'
 SHOT="$(find "$HOME/Library/Caches/ms-playwright" -name chrome-headless-shell -type f 2>/dev/null | sort | tail -1)"
 if [[ -n "$SHOT" ]]; then
-  shot() { # name width height path
-    "$SHOT" --disable-gpu --hide-scrollbars --window-size="$2,$3" --virtual-time-budget=15000 --screenshot="$ROOT/out/ui-check/$1.png" "http://localhost:$UI_PORT$4" >/dev/null 2>&1
-    echo "ui-check: screenshot out/ui-check/$1.png ($2px, $4)"
+  # Real-time screenshots via the DevTools Protocol (scripts/cdp-shot.mjs, Node built-ins only):
+  # the landing page's reveal and WebGL background need real time to finish.
+  shot() { # name width height path [waitMs] [fullPage] [reduced] [scroll]
+    node "$ROOT/scripts/cdp-shot.mjs" "$SHOT" "http://localhost:$UI_PORT$4" "$ROOT/out/ui-check/$1.png" "$2" "$3" "${5:-5000}" "${6:-0}" "${7:-0}" "${8:-0}" | sed 's/^/ui-check: /'
   }
-  shot ui 1440 1600 /dashboard            # the matcher dashboard (was at / before the landing page)
-  shot landing-1440 1440 3200 /
-  shot landing-390 390 3600 /
-  shot v2-1440 1440 1600 /v2
-  shot v2-390 390 2400 /v2
+  shot ui 1440 1600 /dashboard 5000 1                  # the matcher dashboard (was at / before the landing page)
+  shot landing-1440 1440 900 /
+  shot landing-390 390 844 /
+  shot landing-1440-replay 1440 900 / 8000 0 0 "#replay"
+  shot landing-390-replay 390 844 / 8000 0 0 "#replay"
+  shot landing-1440-reduced 1440 900 / 3000 0 1
+  shot v2-1440 1440 1600 /v2 6000 1
+  shot v2-390 390 844 /v2 6000
 else
   echo "ui-check: no headless Chromium found (npx playwright install chromium-headless-shell); skipped screenshot"
 fi
