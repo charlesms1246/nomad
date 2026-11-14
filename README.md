@@ -141,7 +141,7 @@ With keys for the `nomadswarm.testnet` accounts, these targets run against testn
 
 ## Built with
 
-NEAR Intents (`execute_intents`, `simulate_intents`), NEAR Chain Signatures, `near-sdk`, `@noble/curves`, `@noble/hashes`, `ws`, `@modelcontextprotocol/sdk`, `zod`, `vitest`, `fast-check`, Next.js and Tailwind CSS. Built for NEAR HACKATHON 2026, with AI-assisted coding (Claude Code).
+NEAR Intents (`execute_intents`, `simulate_intents`), NEAR Chain Signatures, `near-sdk`, `@noble/curves`, `@noble/hashes`, `ws`, `@modelcontextprotocol/sdk`, `zod`, `vitest`, `fast-check`, Next.js and Tailwind CSS. Built for NEAR HACKATHON 2026.
 
 ## License
 
