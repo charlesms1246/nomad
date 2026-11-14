@@ -70,7 +70,7 @@ export default function Hero() {
           <SweepButton href="#replay" onClick={toReplay}>
             See a ring settle
           </SweepButton>
-          <SweepButton href="/v2?verify=1">Open live rings</SweepButton>
+          <SweepButton href="/rings?verify=1">Open live rings</SweepButton>
         </motion.div>
 
         <motion.div

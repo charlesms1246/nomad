@@ -29,7 +29,7 @@ const FOLLOW_OFFSET = new Vector3(7, 11.5, 11.5)
 const POS_RATE = 2.2
 const LOOK_RATE = 3.5
 
-/** v2 rings: the execute_intents call leaves the rings contract and travels to the Verifier (a bright cube with a short trail). */
+/** Rings contract plays: the execute_intents call leaves the rings contract and travels to the Verifier (a bright cube with a short trail). */
 function ExecutePulse({ director }: { director: Director }) {
   const refs = useRef<(Mesh | null)[]>([])
   const [rx, rz] = stationXZ("rings")

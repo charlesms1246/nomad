@@ -1,20 +1,20 @@
 "use client";
 
-// One v2 ring's whole story, read from testnet for the landing-page replay:
+// One ring's whole story, read from testnet for the landing-page replay:
 // proposed -> legs attached (per wallet standard) -> closed by a stranger -> settled in one
 // execute_intents -> tips paid to the closer -> reputation now.
 // The contract stores no tx hashes, so the propose/attach txs are found through NearBlocks and
 // then read from RPC (matched on the propose return value and on the attach arguments).
 
 import { rpc, type Diff } from "./verify";
-import { NEARBLOCKS_API, RINGS_CONTRACT, fetchReputation, verifyV2Ring, type V2Reputation, type V2Ring } from "./v2";
+import { NEARBLOCKS_API, RINGS_CONTRACT, fetchReputation, verifyRing, type RingReputation, type Ring } from "./rings";
 import { viewCall } from "./verify";
 
 export const DEFAULT_REPLAY_RING = "f5d3e16fca764b6f752ab5d3254b67fd"; // a01 (NEAR) + 0x (Ethereum) + hex (Solana-style), closed by k4
 
 export interface ReplayData {
   source: "live" | "recorded";
-  ring: V2Ring;
+  ring: Ring;
   proposeTx: string | null;
   attach: ({ tx: string; relayedBy: string } | null)[]; // per leg index
   close: {
@@ -29,7 +29,7 @@ export interface ReplayData {
     allMatch: boolean;
   } | null;
   tipsPaid: Diff;
-  reputation: Record<string, V2Reputation>;
+  reputation: Record<string, RingReputation>;
   readAtMs: number;
 }
 
@@ -107,13 +107,13 @@ async function findAttachTxs(ringId: string, k: number): Promise<ReplayData["att
  * change, so known ones skip NearBlocks (rate-limited) and the close is re-verified by hash over RPC.
  */
 export async function loadReplay(ringId: string, known?: ReplayData | null): Promise<ReplayData> {
-  const ring = await viewCall<V2Ring | null>(RINGS_CONTRACT, "get_ring", { ring_id: ringId });
+  const ring = await viewCall<Ring | null>(RINGS_CONTRACT, "get_ring", { ring_id: ringId });
   if (!ring) throw new Error(`Ring ${ringId} not found on ${RINGS_CONTRACT}`);
   const closed = ring.status === "Settled" || ring.status === "Failed";
   const k = known && known.ring.id === ringId ? known : null;
   const knownClose = k?.close && ring.closer === k.close.closer ? { hash: k.close.tx, sender: k.close.closer } : undefined;
   const [check, proposeTx, attach] = await Promise.all([
-    closed ? verifyV2Ring(ring, knownClose).catch(() => null) : Promise.resolve(null),
+    closed ? verifyRing(ring, knownClose).catch(() => null) : Promise.resolve(null),
     k?.proposeTx ? Promise.resolve(k.proposeTx) : findProposeTx(ringId).catch(() => null),
     k && k.attach.every(Boolean)
       ? Promise.resolve(k.attach)

@@ -437,7 +437,7 @@ export default function NomadDashboard() {
             <Link href="/" className="transition-colors hover:text-[#f0efec]">
               Home
             </Link>
-            <Link href="/v2" className="transition-colors hover:text-[#f0efec]">
+            <Link href="/rings" className="transition-colors hover:text-[#f0efec]">
               Live rings
             </Link>
           </nav>

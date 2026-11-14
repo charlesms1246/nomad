@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchConfig, fetchRings, isStranger, walletOf, type V2Config, type V2Ring } from "./v2";
+import { fetchConfig, fetchRings, isStranger, walletOf, type RingsConfig, type Ring } from "./rings";
 
 export interface LandingChain {
-  rings: V2Ring[]; // newest first, up to 20
-  config: V2Config;
+  rings: Ring[]; // newest first, up to 20
+  config: RingsConfig;
 }
 
 let shared: Promise<LandingChain> | null = null;
@@ -36,7 +36,7 @@ export function useLandingChain(): LandingChain | null | "error" {
 }
 
 /** Wallet labels used in a ring, in leg order, without repeats. */
-export function walletMix(r: V2Ring): string[] {
+export function walletMix(r: Ring): string[] {
   return [...new Set(r.legs.map((l, i) => walletOf(r.standards[i] ?? null, l.agent).label))];
 }
 

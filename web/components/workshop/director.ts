@@ -74,7 +74,7 @@ export interface Play {
   legs: string[] // agent accounts, in ring order
   closer: string
   tx: string | null
-  version: "v1" | "v2"
+  version: "matcher" | "contract"
 }
 
 function playFromRing(r: Ring): Play {
@@ -83,21 +83,21 @@ function playFromRing(r: Ring): Play {
     legs: r.legs.map((l) => l.agent),
     closer: cleanAccount(r.matcher),
     tx: r.txHash,
-    version: "v1",
+    version: "matcher",
   }
 }
 
-const V2_PLAY: Play | null = (() => {
+const CONTRACT_PLAY: Play | null = (() => {
   const d = replayFallback as unknown as {
     ring?: { id: string; legs: { agent: string }[]; closer?: string; status?: string }
     close?: { tx: string; closer: string; success: boolean } | null
   }
   if (!d.ring || !d.close?.success) return null
-  return { id: d.ring.id, legs: d.ring.legs.map((l) => l.agent), closer: d.close.closer, tx: d.close.tx, version: "v2" }
+  return { id: d.ring.id, legs: d.ring.legs.map((l) => l.agent), closer: d.close.closer, tx: d.close.tx, version: "contract" }
 })()
 
-/** Plays the director adds on its own (the recorded v2 ring), so their bots get built too. */
-export const extraPlays = (): Play[] => (V2_PLAY ? [V2_PLAY] : [])
+/** Plays the director adds on its own (the recorded rings-contract ring), so their bots get built too. */
+export const extraPlays = (): Play[] => (CONTRACT_PLAY ? [CONTRACT_PLAY] : [])
 
 /** Settled rings in the state, oldest first, one per ring id. */
 export function settledPlays(state: NomadState | null): Play[] {
@@ -172,7 +172,7 @@ function script(p: Play): { steps: Step[]; phases: Phase[]; settleAt: number } {
   const closer = shortName(p.closer)
   p.legs.forEach((a, i) => {
     steps.push({ at: 0.2 + i * 0.25, bot: a, to: dock("board", i, n), task: "posts an offer" })
-    const attach = p.version === "v2" ? "attaches its leg" : "signs its leg"
+    const attach = p.version === "contract" ? "attaches its leg" : "signs its leg"
     if (viaMandate(a)) {
       steps.push({ at: 2.8 + i * 0.2, bot: a, to: dock("mandate", 0, 1), task: "signs through its mandate" })
       steps.push({ at: 4.4, bot: a, to: dock("rings", i, n + 1), task: attach })
@@ -181,22 +181,22 @@ function script(p: Play): { steps: Step[]; phases: Phase[]; settleAt: number } {
     }
   })
   steps.push({ at: 5.4, bot: p.closer, to: dock("rings", n, n + 1), task: "closes the ring" })
-  // v1: the matcher submits execute_intents itself, so it walks to the Verifier. v2: the closer only calls
+  // matcher plays: the matcher submits execute_intents itself, so it walks to the Verifier. Contract plays: the closer only calls
   // close_ring; the rings contract makes the execute_intents call (drawn as a pulse from the contract to the Verifier).
-  if (p.version === "v1") steps.push({ at: 6.9, bot: p.closer, to: dock("verifier", 0, 1), task: "execute_intents" })
+  if (p.version === "matcher") steps.push({ at: 6.9, bot: p.closer, to: dock("verifier", 0, 1), task: "execute_intents" })
   const settleAt = 8.4
   for (const a of p.legs) steps.push({ at: settleAt, bot: a, to: dock("rings", p.legs.indexOf(a), n + 1), task: "settled" })
-  if (p.version === "v2") steps.push({ at: 9.4, bot: p.closer, to: dock("reputation", 0, 1), task: "reputation updated" })
+  if (p.version === "contract") steps.push({ at: 9.4, bot: p.closer, to: dock("reputation", 0, 1), task: "reputation updated" })
   for (const a of p.legs) steps.push({ at: 10.0, bot: a, to: "home", task: null })
-  steps.push({ at: p.version === "v2" ? 11.0 : 10.0, bot: p.closer, to: "home", task: null })
+  steps.push({ at: p.version === "contract" ? 11.0 : 10.0, bot: p.closer, to: "home", task: null })
   const names = p.legs.map((a) => shortName(a)).join(", ")
   const phases: Phase[] = [
     { at: 0, text: `${names} post offers on the board` },
-    { at: 2.8, text: p.version === "v2" ? "Each leg is attached to the ring, signed by its own wallet" : "Each agent signs its leg of the ring" },
-    { at: 5.4, text: p.version === "v2" ? `${closer} calls close_ring on the rings contract` : `${closer} closes the ring` },
+    { at: 2.8, text: p.version === "contract" ? "Each leg is attached to the ring, signed by its own wallet" : "Each agent signs its leg of the ring" },
+    { at: 5.4, text: p.version === "contract" ? `${closer} calls close_ring on the rings contract` : `${closer} closes the ring` },
     {
       at: 6.9,
-      text: p.version === "v2" ? "The rings contract settles every leg in one execute_intents call" : `${closer} submits one execute_intents call to the Verifier`,
+      text: p.version === "contract" ? "The rings contract settles every leg in one execute_intents call" : `${closer} submits one execute_intents call to the Verifier`,
     },
     { at: settleAt, text: `Settled: ${n} agents traded in one transaction` },
   ]
@@ -216,7 +216,7 @@ export interface DirectorNow {
   phase: string
   settled: boolean
   focus: string | null // bot the camera follows
-  pulse: number | null // v2: progress 0..1 of the execute_intents call travelling rings contract -> Verifier
+  pulse: number | null // contract plays: progress 0..1 of the execute_intents call travelling rings contract -> Verifier
 }
 
 /** Plays rings back to back on the scene clock (seconds). */
@@ -238,7 +238,7 @@ export class Director {
 
   /** Recorded or live plays. Live rings not seen before jump the queue. */
   setPlays(plays: Play[], live: boolean) {
-    const all = V2_PLAY ? [V2_PLAY, ...plays.filter((p) => p.id !== V2_PLAY.id)] : plays
+    const all = CONTRACT_PLAY ? [CONTRACT_PLAY, ...plays.filter((p) => p.id !== CONTRACT_PLAY.id)] : plays
     const first = this.known.size === 0
     for (const p of all) {
       if (this.known.has(p.id)) continue
@@ -291,7 +291,7 @@ export class Director {
       phase,
       settled: lt >= c.settleAt,
       focus: lt < 5.2 ? c.play.legs[0] : c.play.closer,
-      pulse: c.play.version === "v2" && lt >= PULSE_AT && lt < c.settleAt ? (lt - PULSE_AT) / (c.settleAt - PULSE_AT) : null,
+      pulse: c.play.version === "contract" && lt >= PULSE_AT && lt < c.settleAt ? (lt - PULSE_AT) / (c.settleAt - PULSE_AT) : null,
     }
   }
 

@@ -14,7 +14,7 @@ export default function Footer() {
           <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[#f0efec]">
             GitHub
           </a>
-          <Link href="/v2" className="hover:text-[#f0efec]">
+          <Link href="/rings" className="hover:text-[#f0efec]">
             Live rings
           </Link>
           <Link href="/dashboard" className="hover:text-[#f0efec]">

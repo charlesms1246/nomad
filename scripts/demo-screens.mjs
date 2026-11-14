@@ -1,6 +1,6 @@
 // Capture crisp crops of the real Nomad UI for the demo deck's in-scene monitors.
 //   node scripts/demo-screens.mjs <base url, e.g. http://localhost:3000> <out dir>
-// Opens /v2?verify=1, waits until every closed ring shows "Verified on chain", then saves one
+// Opens /rings?verify=1, waits until every closed ring shows "Verified on chain", then saves one
 // PNG per ring card (2x scale), named by ring id. Also saves the landing hero at 1440x900.
 import { spawn } from "node:child_process";
 import { writeFile, mkdir } from "node:fs/promises";
@@ -34,9 +34,9 @@ await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, dev
 await send("Page.navigate", { url: base + "/" }); await sleep(9000);
 await shoot("landing-hero", { x: 0, y: 0, width: 1440, height: 900 });
 
-/* v2 with on-chain verification */
+/* /rings with on-chain verification */
 await send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
-await send("Page.navigate", { url: base + "/v2?verify=1" });
+await send("Page.navigate", { url: base + "/rings?verify=1" });
 for (let i = 0; i < 90; i++) { await sleep(1000);
   const n = await ev(`(document.body.innerText.match(/Verified on chain/g) || []).length`); if (n >= 4) break; }
 await sleep(1500);
@@ -56,6 +56,6 @@ const cards = await ev(`(() => {
   const top = document.querySelector('h1')?.parentElement?.getBoundingClientRect();
   return { cards: out, top: top ? { x: top.x, y: top.y + scrollY, w: top.width, h: top.height } : null };
 })()`);
-for (const c of cards.cards) await shoot("v2-ring-" + c.id, { x: c.x - 8, y: c.y - 8, width: c.w + 16, height: c.h + 16 });
-if (cards.top) await shoot("v2-header", { x: cards.top.x - 8, y: cards.top.y - 8, width: cards.top.w + 16, height: cards.top.h + 16 });
+for (const c of cards.cards) await shoot("ring-" + c.id, { x: c.x - 8, y: c.y - 8, width: c.w + 16, height: c.h + 16 });
+if (cards.top) await shoot("rings-header", { x: cards.top.x - 8, y: cards.top.y - 8, width: cards.top.w + 16, height: cards.top.h + 16 });
 chrome.kill(); ws.close(); process.exit(0);

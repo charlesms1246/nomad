@@ -1,6 +1,6 @@
 "use client";
 
-// Nomad v2: the open rings contract (contracts/rings), read straight from testnet RPC by the browser.
+// The open rings contract (contracts/rings), read straight from testnet RPC by the browser.
 // Anyone proposes a ring; each agent attaches its own signed leg in any wallet standard; anyone closes
 // it with one execute_intents (called by the contract) and earns the legs' tips.
 
@@ -12,7 +12,7 @@ export const VERIFIER = "intents.nomadswarm.testnet";
 export const NEARBLOCKS_API = "https://api-testnet.nearblocks.io/v1";
 
 /** config/testnet.json tokens (no USD prices on this page). */
-export const V2_TOKENS: TokenMeta[] = [
+export const RING_TOKENS: TokenMeta[] = [
   { id: "nep141:wnear.nomadswarm.testnet", symbol: "wNEAR", decimals: 24, priceUsd: null },
   { id: "nep141:usdc.nomadswarm.testnet", symbol: "USDC", decimals: 6, priceUsd: null },
   { id: "nep141:usdt.nomadswarm.testnet", symbol: "USDT", decimals: 6, priceUsd: null },
@@ -22,7 +22,7 @@ export const V2_TOKENS: TokenMeta[] = [
 
 /* ---------- contract shapes (contracts/rings/src/lib.rs) ---------- */
 
-export interface V2Leg {
+export interface RingLeg {
   agent: string; // NEAR account, 64-hex implicit id, or 0x address
   give: string;
   give_amt: string;
@@ -31,23 +31,23 @@ export interface V2Leg {
   tip: { token: string; amt: string } | null;
 }
 
-export type V2Status = "Open" | "Closing" | "Settled" | "Failed";
+export type RingState = "Open" | "Closing" | "Settled" | "Failed";
 
-export interface V2Ring {
+export interface Ring {
   id: string;
   proposer: string;
-  legs: V2Leg[];
+  legs: RingLeg[];
   deadline_ms: number;
   signed: (string | null)[];
   standards: (string | null)[];
-  status: V2Status;
+  status: RingState;
   closer: string | null;
   close_attempts: number;
   created_ms: number;
   settled_ms: number | null;
 }
 
-export interface V2Reputation {
+export interface RingReputation {
   agent_uri: string | null;
   registered_by: string | null;
   rings_settled: number;
@@ -55,7 +55,7 @@ export interface V2Reputation {
   legs_in_failed_closes: number;
 }
 
-export interface V2Config {
+export interface RingsConfig {
   owner: string;
   verifier: string;
   fee_pips: number;
@@ -63,9 +63,9 @@ export interface V2Config {
   settled: number;
 }
 
-export const fetchRings = (from = 0, limit = 20) => viewCall<V2Ring[]>(RINGS_CONTRACT, "rings", { from, limit });
-export const fetchConfig = () => viewCall<V2Config>(RINGS_CONTRACT, "config");
-export const fetchReputation = (agent: string) => viewCall<V2Reputation>(RINGS_CONTRACT, "reputation", { agent });
+export const fetchRings = (from = 0, limit = 20) => viewCall<Ring[]>(RINGS_CONTRACT, "rings", { from, limit });
+export const fetchConfig = () => viewCall<RingsConfig>(RINGS_CONTRACT, "config");
+export const fetchReputation = (agent: string) => viewCall<RingReputation>(RINGS_CONTRACT, "reputation", { agent });
 
 /* ---------- wallet standards ---------- */
 
@@ -98,7 +98,7 @@ export function shortId(id: string): string {
   return id.replace(/\.nomadswarm\.testnet$/, "");
 }
 
-export const isStranger = (r: V2Ring) => !!r.closer && !r.legs.some((l) => l.agent.toLowerCase() === r.closer!.toLowerCase());
+export const isStranger = (r: Ring) => !!r.closer && !r.legs.some((l) => l.agent.toLowerCase() === r.closer!.toLowerCase());
 
 /* ---------- finding a ring's close transaction ---------- */
 // The contract doesn't store tx hashes. NearBlocks lists close_ring calls; each candidate is then read
@@ -155,9 +155,9 @@ export async function findCloseTx(ringId: string): Promise<CloseTx | null> {
   return fallback;
 }
 
-/* ---------- re-check a v2 ring against its close transaction ---------- */
+/* ---------- re-check a ring against its close transaction ---------- */
 
-export interface V2LegCheck {
+export interface RingLegCheck {
   index: number;
   agent: string;
   attachedStandard: string | null; // from the contract
@@ -170,7 +170,7 @@ export interface V2LegCheck {
   match: boolean;
 }
 
-export interface V2Verification {
+export interface RingVerification {
   txHash: string;
   closer: string; // tx signer
   stranger: boolean;
@@ -178,20 +178,20 @@ export interface V2Verification {
   executedHeight: number | null;
   success: boolean;
   status: string;
-  legs: V2LegCheck[];
+  legs: RingLegCheck[];
   tipsPaid: Diff; // token -> amount moved from the rings contract to the closer
   tipsExpected: Diff;
   allMatch: boolean;
   checkedAtMs: number;
 }
 
-export async function verifyV2Ring(ring: V2Ring, override?: CloseTx): Promise<V2Verification> {
+export async function verifyRing(ring: Ring, override?: CloseTx): Promise<RingVerification> {
   const close = override ?? (await findCloseTx(ring.id));
   if (!close) throw new Error("No close_ring transaction found for this ring yet");
   const s = await inspectSettlement(close.hash, close.sender, VERIFIER);
   if (s.txArgs?.ring_id !== ring.id) throw new Error(`That transaction closes ring ${String(s.txArgs?.ring_id ?? "?")}, not this one`);
 
-  const legs: V2LegCheck[] = ring.legs.map((l, i) => {
+  const legs: RingLegCheck[] = ring.legs.map((l, i) => {
     const lc = l.agent.toLowerCase();
     const claimed: Diff = { [l.give]: (-BigInt(l.give_amt)).toString(), [l.get]: BigInt(l.get_amt).toString() };
     const sg = s.signed.get(lc) ?? null;
@@ -245,9 +245,9 @@ export async function verifyV2Ring(ring: V2Ring, override?: CloseTx): Promise<V2
   };
 }
 
-const key = (ringId: string) => `v2:${ringId}`;
-export const recheckV2 = (ring: V2Ring, override?: CloseTx) => runCheck(key(ring.id), () => verifyV2Ring(ring, override));
-export const useV2Check = (ringId: string): CheckState<V2Verification> => useCheck<V2Verification>(key(ringId));
+const key = (ringId: string) => `ring:${ringId}`;
+export const recheckRing = (ring: Ring, override?: CloseTx) => runCheck(key(ring.id), () => verifyRing(ring, override));
+export const useRingCheck = (ringId: string): CheckState<RingVerification> => useCheck<RingVerification>(key(ringId));
 
 /* ---------- erc191 legs that are not a plain hot wallet ---------- */
 // (a) Mandate-controlled: the 0x address belongs to mandate.nomadswarm.testnet, which signs legs through

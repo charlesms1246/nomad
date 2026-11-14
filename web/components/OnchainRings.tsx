@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { STATUS, fmtAmtExact as fmtAmt, shortHash, tokenIndexOf, type TokenIndex } from "@/lib/format";
 import {
   RINGS_CONTRACT,
-  V2_TOKENS,
+  RING_TOKENS,
   VERIFIER,
   MANDATE_CONTRACT,
   fetchConfig,
@@ -16,17 +16,17 @@ import {
   fetchRings,
   mandateDay,
   isStranger,
-  recheckV2,
+  recheckRing,
   shortId,
-  useV2Check,
+  useRingCheck,
   walletOf,
   type Erc7683Order,
   type Mandate,
-  type V2Config,
-  type V2Reputation,
-  type V2Ring,
-  type V2Verification,
-} from "@/lib/v2";
+  type RingsConfig,
+  type RingReputation,
+  type Ring,
+  type RingVerification,
+} from "@/lib/rings";
 import { TESTNET_RPC, type Diff } from "@/lib/verify";
 
 const EXPLORER = "https://testnet.nearblocks.io";
@@ -35,7 +35,7 @@ const REFRESH_MS = 15_000;
 // Wallet identity colours (categorical slots, dark steps), fixed per standard.
 const WALLET_COLOR: Record<string, string> = { NEAR: "#3987e5", "Ethereum wallet": "#d95926", "Solana-style": "#9085e9", "ed25519 key": "#9085e9" };
 
-const STATUS_STYLE: Record<V2Ring["status"], { c: string; icon: string; label: string }> = {
+const STATUS_STYLE: Record<Ring["status"], { c: string; icon: string; label: string }> = {
   Open: { c: "#c3c2b7", icon: "…", label: "open" },
   Closing: { c: STATUS.warning, icon: "→", label: "closing" },
   Settled: { c: STATUS.good, icon: "✓", label: "settled" },
@@ -82,7 +82,7 @@ function sumTips(ix: TokenIndex, d: Diff) {
   return e.length ? e.map(([t, v]) => fmtAmt(ix, t, v)).join(", ") : "none";
 }
 
-function CheckResult({ ix, ring, r }: { ix: TokenIndex; ring: V2Ring; r: V2Verification }) {
+function CheckResult({ ix, ring, r }: { ix: TokenIndex; ring: Ring; r: RingVerification }) {
   const ok = r.allMatch;
   const blocks = r.executedHeight != null ? r.executedHeight - r.includedHeight : null;
   return (
@@ -144,7 +144,7 @@ interface Extras {
   orders: Map<string, Erc7683Order | null>; // `${agent}|${give}|${get}` -> order
 }
 const orderKey = (agent: string, give: string, get: string) => `${agent.toLowerCase()}|${give}|${get}`;
-const isErc191Leg = (ring: V2Ring, i: number) => ring.standards[i] === "erc191" || (!ring.standards[i] && /^0x[0-9a-f]{40}$/i.test(ring.legs[i].agent));
+const isErc191Leg = (ring: Ring, i: number) => ring.standards[i] === "erc191" || (!ring.standards[i] && /^0x[0-9a-f]{40}$/i.test(ring.legs[i].agent));
 
 /** Human rate: rate_num/rate_den is in smallest units of want per give. */
 function humanRate(ix: TokenIndex, give: string, want: string, num: string, den: string): string {
@@ -187,8 +187,8 @@ function SpecialBadge({ label, color, lines }: { label: string; color: string; l
   );
 }
 
-function RingCard({ ix, ring, auto, extras }: { ix: TokenIndex; ring: V2Ring; auto: boolean; extras: Extras | null }) {
-  const v = useV2Check(ring.id);
+function RingCard({ ix, ring, auto, extras }: { ix: TokenIndex; ring: Ring; auto: boolean; extras: Extras | null }) {
+  const v = useRingCheck(ring.id);
   // The contract refuses attach/close after the deadline; an Open ring past it can no longer settle.
   const [now] = useState(() => Date.now());
   const expired = ring.status === "Open" && ring.deadline_ms < now;
@@ -201,7 +201,7 @@ function RingCard({ ix, ring, auto, extras }: { ix: TokenIndex; ring: V2Ring; au
   const [paste, setPaste] = useState("");
 
   useEffect(() => {
-    if (auto && closed && v.phase === "idle") recheckV2(ring);
+    if (auto && closed && v.phase === "idle") recheckRing(ring);
   }, [auto, closed, v.phase, ring]);
 
   return (
@@ -295,7 +295,7 @@ function RingCard({ ix, ring, auto, extras }: { ix: TokenIndex; ring: V2Ring; au
         </span>
         {closed && (
           <button
-            onClick={() => recheckV2(ring)}
+            onClick={() => recheckRing(ring)}
             disabled={v.phase === "checking"}
             className="rounded-full border border-white/15 px-3 py-1 font-medium text-[#f0efec] hover:border-white/40 disabled:opacity-50"
           >
@@ -311,7 +311,7 @@ function RingCard({ ix, ring, auto, extras }: { ix: TokenIndex; ring: V2Ring; au
             className="flex gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              if (paste.trim() && ring.closer) recheckV2(ring, { hash: paste.trim(), sender: ring.closer });
+              if (paste.trim() && ring.closer) recheckRing(ring, { hash: paste.trim(), sender: ring.closer });
             }}
           >
             <input
@@ -329,7 +329,7 @@ function RingCard({ ix, ring, auto, extras }: { ix: TokenIndex; ring: V2Ring; au
   );
 }
 
-function ReputationTable({ rings }: { rings: V2Ring[] }) {
+function ReputationTable({ rings }: { rings: Ring[] }) {
   const ids = useMemo(() => {
     const s = new Set<string>();
     for (const r of rings) {
@@ -343,7 +343,7 @@ function ReputationTable({ rings }: { rings: V2Ring[] }) {
     for (const r of rings) r.legs.forEach((l, i) => r.standards[i] && m.set(l.agent, r.standards[i]));
     return m;
   }, [rings]);
-  const [rep, setRep] = useState<Record<string, V2Reputation>>({});
+  const [rep, setRep] = useState<Record<string, RingReputation>>({});
   const key = ids.join(",");
   useEffect(() => {
     let stop = false;
@@ -406,10 +406,10 @@ function ReputationTable({ rings }: { rings: V2Ring[] }) {
   );
 }
 
-export default function V2Rings() {
-  const ix = useMemo(() => tokenIndexOf(V2_TOKENS), []);
-  const [rings, setRings] = useState<V2Ring[] | null>(null);
-  const [cfg, setCfg] = useState<V2Config | null>(null);
+export default function OnchainRings() {
+  const ix = useMemo(() => tokenIndexOf(RING_TOKENS), []);
+  const [rings, setRings] = useState<Ring[] | null>(null);
+  const [cfg, setCfg] = useState<RingsConfig | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
   const [auto, setAuto] = useState(false);
@@ -468,7 +468,7 @@ export default function V2Rings() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[#f0efec]">
-            Nomad v2 <span className="font-normal text-[#898781]">· open rings, any wallet</span>
+            Live rings <span className="font-normal text-[#898781]">· open rings, any wallet</span>
           </h1>
           <p className="mt-1 max-w-3xl text-sm leading-relaxed text-[#898781]">
             Anyone proposes a ring. Each agent attaches its own signed leg, from a NEAR account, an Ethereum wallet or a Solana-style key. Anyone can close the ring:

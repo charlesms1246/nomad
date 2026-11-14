@@ -12,7 +12,7 @@ export default function Nav() {
           NOMAD<span className="text-[var(--accent-color)]">.</span>
         </Link>
         <div className="flex items-center gap-4 text-sm text-[#c3c2b7] sm:gap-6">
-          <Link href="/v2" className="hover:text-[#f0efec]">
+          <Link href="/rings" className="hover:text-[#f0efec]">
             Live rings
           </Link>
           <Link href="/dashboard" className="hover:text-[#f0efec]">

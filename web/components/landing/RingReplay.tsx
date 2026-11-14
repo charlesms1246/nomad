@@ -1,6 +1,6 @@
 "use client";
 
-// Replays one real v2 ring from rings.nomadswarm.testnet, stage by stage, as a
+// Replays one real ring from rings.nomadswarm.testnet, stage by stage, as a
 // lifecycle bento (pending / active / done cells, sweep light, prev / next / pause with
 // auto-resume), with plain headings and real chain data. Reads testnet when the section nears the
 // viewport; until then, or if RPC fails, it shows a saved copy of the same ring.
@@ -10,9 +10,9 @@ import { motion } from "framer-motion";
 import { Check, ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import fallback from "@/lib/replay-fallback.json";
 import { DEFAULT_REPLAY_RING, loadReplay, type ReplayData } from "@/lib/replay";
-import { V2_TOKENS, shortId } from "@/lib/v2";
+import { RING_TOKENS, shortId } from "@/lib/rings";
 import { fmtAmtExact, tokenIndexOf } from "@/lib/format";
-import { WalletBadge } from "@/components/V2Rings";
+import { WalletBadge } from "@/components/OnchainRings";
 
 const EXPLORER = "https://testnet.nearblocks.io";
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -22,7 +22,7 @@ const MANUAL_RESUME_MS = 15_000;
 const ACCENT = "#3987e5";
 const GOOD = "#0ca30c";
 
-const ix = tokenIndexOf(V2_TOKENS);
+const ix = tokenIndexOf(RING_TOKENS);
 const amt = (t: string, a: string) => fmtAmtExact(ix, t, a);
 const sym = (t: string) => ix.get(t)?.symbol ?? t;
 const n = (h: number) => h.toLocaleString("en-US");
@@ -345,7 +345,7 @@ export default function RingReplay() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 px-5 py-3 text-xs text-[#898781]">
         <span>Every link opens the real testnet transaction.</span>
-        <a href={`/v2?verify=1#${ring.id}`} className="text-[#86b6ef] hover:underline">
+        <a href={`/rings?verify=1#${ring.id}`} className="text-[#86b6ef] hover:underline">
           Check this ring yourself →
         </a>
       </div>

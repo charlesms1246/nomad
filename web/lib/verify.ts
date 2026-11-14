@@ -5,8 +5,8 @@
 // API or the rings contract beyond the tx hash and the signer id.
 //
 // Works for both shapes:
-//   v1  the tx itself calls execute_intents on the Verifier (matcher or delegated relayer key);
-//   v2  the tx calls close_ring on rings.nomadswarm.testnet, whose receipt calls execute_intents.
+//   matcher: the tx itself calls execute_intents on the Verifier (matcher or delegated relayer key);
+//   rings contract: the tx calls close_ring on rings.nomadswarm.testnet, whose receipt calls execute_intents.
 // Signed legs are decoded per wallet standard (nep413, erc191, raw_ed25519, ...).
 
 import { useSyncExternalStore } from "react";
@@ -142,7 +142,7 @@ export interface Settlement {
   txReceiver: string;
   txMethod: string;
   txArgs: Record<string, unknown> | null;
-  /** True when the tx calls another contract whose receipt calls execute_intents (v2 rings). */
+  /** True when the tx calls another contract whose receipt calls execute_intents (the rings contract). */
   viaContract: boolean;
   includedHeight: number;
   /** Outcome of the execute_intents receipt itself (not the outer tx). */
