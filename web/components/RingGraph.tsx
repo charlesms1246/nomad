@@ -87,7 +87,28 @@ export default function RingGraph({ state, ix, ring, pair, flash, showDeltas, di
     // Label point at t = 0.3 along the curve (nearer the giver), so long legs' pills stay out of the centre.
     const t = 0.3;
     const at = (u: number) => ({ x: (1 - u) * (1 - u) * s.x + 2 * (1 - u) * u * qx + u * u * e.x, y: (1 - u) * (1 - u) * s.y + 2 * (1 - u) * u * qy + u * u * e.y });
-    return { d: `M ${s.x} ${s.y} Q ${qx} ${qy} ${e.x} ${e.y}`, mid: at(t) };
+    return { d: `M ${s.x} ${s.y} Q ${qx} ${qy} ${e.x} ${e.y}`, mid: at(t), at };
+  };
+
+  // The centre status box (kept in sync with the <rect> under "Center status").
+  const box = ring ? { x0: C - 150, x1: C + 150, y0: C - 44, y1: C - 44 + (ring.txHash ? 108 : 64) } : null;
+  /** Pick a label point along the curve whose pill (w×h) stays clear of the status box. */
+  // Pills already placed this render, so later pills avoid them too.
+  const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  const labelAt = (c: ReturnType<typeof curve>, w = 104, h = 22, gap = 4) => {
+    const rect = (p: { x: number; y: number }) => ({ x0: p.x - w / 2 - gap, x1: p.x + w / 2 + gap, y0: p.y - h / 2 - gap, y1: p.y + h / 2 + gap });
+    const hits = (a: ReturnType<typeof rect>, b: { x0: number; x1: number; y0: number; y1: number }) =>
+      !(a.x1 < b.x0 || a.x0 > b.x1 || a.y1 < b.y0 || a.y0 > b.y1);
+    let pick = c.mid;
+    for (const u of [0.3, 0.22, 0.38, 0.15, 0.46, 0.08, 0.55, 0.62, 0.7, 0.78]) {
+      const r = rect(c.at(u));
+      if ((!box || !hits(r, box)) && !placed.some((q) => hits(r, q))) {
+        pick = c.at(u);
+        break;
+      }
+    }
+    placed.push(rect(pick));
+    return pick;
   };
 
   const st = ring ? statusLine(ring) : null;
@@ -134,6 +155,7 @@ export default function RingGraph({ state, ix, ring, pair, flash, showDeltas, di
         const b = pos.get(f.to);
         if (!a || !b) return null;
         const c = curve(a, b);
+        const lp = labelAt(c);
         const color = failed ? STATUS.critical : settled ? STATUS.good : f.lit ? tokenColor(ix, f.token) : "#5c5b57";
         return (
           <g key={i}>
@@ -147,7 +169,7 @@ export default function RingGraph({ state, ix, ring, pair, flash, showDeltas, di
               className={settled ? "nomad-glow" : undefined}
               style={{ transition: "stroke 400ms" }}
             />
-            <g transform={`translate(${c.mid.x} ${c.mid.y})`}>
+            <g transform={`translate(${lp.x} ${lp.y})`}>
               <rect x={-52} y={-11} width={104} height={22} rx={11} fill="#0d0d0d" stroke={color} strokeOpacity={0.7} />
               <text textAnchor="middle" y={4} className="fill-[#f0efec] text-[11px] font-mono">
                 {fmtNum(toUnits(ix, f.token, f.amt))} {sym(ix, f.token)}

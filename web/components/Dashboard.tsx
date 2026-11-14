@@ -10,6 +10,8 @@ import RingsTable from "./RingsTable";
 import { RacePanel, SwarmPanel } from "./Charts";
 
 const POLL_MS = 1000;
+// view_account code_hash of intents.nomadswarm.testnet and mainnet intents.near (identical, read 2026-11-14).
+const VERIFIER_CODE_HASH = "BtA1BEFNS619KkvXFsgcpQ21Tb5yMm32aaUkn7xNothk";
 
 export default function Dashboard() {
   const [live, setLive] = useState<NomadState | null>(null);
@@ -154,7 +156,21 @@ export default function Dashboard() {
             Nomad <span className="font-normal text-[#898781]">· agents trade in rings, settled in one NEAR Intents call</span>
           </h1>
           <p className="mt-1 text-xs text-[#898781]">
-            Verifier <span className="font-mono text-[#c3c2b7]">{state.meta.verifier}</span>
+            Verifier{" "}
+            <a
+              href={`https://testnet.nearblocks.io/address/${state.meta.verifier}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#c3c2b7] underline decoration-white/20 underline-offset-2 hover:decoration-white/60"
+            >
+              {state.meta.verifier}
+            </a>
+            {state.meta.verifier === "intents.nomadswarm.testnet" && (
+              <span title={`Code hash ${VERIFIER_CODE_HASH} on both accounts (checked 2026-11-14); no full-access key on the testnet Verifier`}>
+                {" "}
+                (same code as mainnet intents.near, code hash <span className="font-mono">{VERIFIER_CODE_HASH.slice(0, 8)}…</span>)
+              </span>
+            )}
             {state.meta.verifierShard != null && <> · shard {state.meta.verifierShard}</>} · board{" "}
             <span className="font-mono text-[#c3c2b7]">{state.meta.board}</span>
           </p>
