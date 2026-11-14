@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { GITHUB_URL } from "./Nav";
+import LogoMark from "@/components/LogoMark";
 
 export default function Footer() {
   return (
     <footer className="mx-auto w-full max-w-6xl px-5 pb-10 pt-20 sm:px-8">
       <div className="flex flex-col gap-8 border-t border-white/10 pt-10 md:flex-row md:items-end md:justify-between">
         <p className="font-pixel text-6xl leading-none text-[#f0efec] sm:text-7xl">
+          <LogoMark className="mr-[0.2em] inline-block h-[1.1em] w-[1.1em] align-[-0.2em]" />
           NOMAD<span className="text-[var(--accent-color)]">.</span>
         </p>
         <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-[#c3c2b7]">

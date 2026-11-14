@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { NomadState, Ring } from "@/lib/types";
 import { fmtAmtExact, shortAgent, shortHash, sym, tokenColor, tokenIndex, toUnits, type TokenIndex } from "@/lib/format";
 import WorkshopSlot from "./WorkshopSlot";
+import LogoMark from "@/components/LogoMark";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 const POLL_MS = 2000;
@@ -428,6 +429,7 @@ export default function NomadDashboard() {
           <Link href="/" className="group flex items-center gap-2 text-[#f0efec]">
             <ArrowLeft size={18} className="text-[#898781] transition-transform duration-300 group-hover:-translate-x-1" />
             <span className="font-pixel text-3xl leading-none">
+              <LogoMark className="mr-[0.2em] inline-block h-[1.1em] w-[1.1em] align-[-0.2em]" />
               NOMAD<span className="text-[var(--accent-color)]">.</span>
             </span>
           </Link>
