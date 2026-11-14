@@ -1,4 +1,4 @@
-// Stitch the demo video (silent, 1920x1080, 30 fps, H.264):
+// Stitch the demo video (silent, 1920x1080, 30 fps, H.264), 139.9 s so it fits X's 2:20 limit; one file, no variants:
 //   cold open (the scene-3 settle with one line on screen) -> push-through transition -> deck scenes 0-4 -> the real site (landing hero, ring
 //   replay, /dashboard workshop, /rings?verify=1) -> deck scene 5 -> the proof figures -> end card.
 //   node scripts/stitch-demo.mjs [in dir = out/demo] [out = out/demo/nomad-demo.mp4]
@@ -37,7 +37,7 @@ const BLOCKS = [
   { name: "Figure: 27 rings settled, 0 failed", png: "cards/num-1.png", secs: 2.4, zoom: [1.0, 1.06, 0.5, 0.45] },
   { name: "Figure: 3 wallet standards in one ring", png: "cards/num-2.png", secs: 2.4, zoom: [1.0, 1.06, 0.5, 0.45] },
   { name: "Figure: 0 access keys", png: "cards/num-3.png", secs: 2.4, zoom: [1.0, 1.06, 0.5, 0.45] },
-  { name: "End card", file: "logo-end.mp4", pieces: [[0, 4.0]], zoom: [1.0, 1.03, 0.5, 0.5], fadeOut: 0.6 },
+  { name: "End card", file: "logo-end.mp4", pieces: [[0, 3.4]], zoom: [1.0, 1.03, 0.5, 0.5], fadeOut: 0.6 },
 ];
 
 const inputs = [], chains = [];
