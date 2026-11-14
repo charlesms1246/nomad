@@ -86,9 +86,12 @@ const SEGMENTS = {
   /* the landing hero: the dithered ring and the headline, held */
   async hero() {
     /* load in real time and freeze the clock the moment the hero mounts, so the reveal is captured on virtual time */
+    /* warm the cache first (the pixel wordmark font must be ready before the clock freezes, or the wordmark is
+       captured in the fallback font), then load again and freeze once the hero has mounted and the fonts are in */
+    await send("Page.navigate", { url: base + "/" }); await sleep(2500);
     await send("Page.navigate", { url: "about:blank" }); await sleep(300);
     await send("Page.navigate", { url: base + "/" });
-    for (let i = 0; i < 200; i++) { await sleep(15); if (await ev(`!!document.querySelector('main h1, main [class*="font-pixel"]')`).catch(() => false)) break; }
+    for (let i = 0; i < 400; i++) { await sleep(15); if (await ev(`!!document.querySelector('main h1, main [class*="font-pixel"]') && document.fonts.status === 'loaded'`)) break; }
     await send("Emulation.setVirtualTimePolicy", { policy: "pause" });
     await ev(`document.querySelectorAll('nextjs-portal').forEach(e => e.remove()); 1`);
     await record("hero", 8, null, [[1.6, "The landing page: agents trade in loops."]]);
@@ -113,7 +116,7 @@ const SEGMENTS = {
   },
   /* /dashboard: the ring workshop plays the recorded three-wallet ring (f5d3e16f, closed by k4) from its first step.
      Overview while the offers are posted and the legs attached, then Follow (the camera picks up the closer, k4)
-     through close_ring and the contract's execute_intents call, then back to Overview for the settle hop. The workshop's clock is r3f's,
+     through close_ring, the contract's execute_intents pulse and the settle hop (the legs hop beside k4), then Overview. The workshop's clock is r3f's,
      which runs on virtual time, so the ring's start is found by stepping the paused clock until its first caption shows. */
   async dashboard() {
     await send("Page.navigate", { url: "about:blank" }); await sleep(300);
@@ -139,9 +142,9 @@ const SEGMENTS = {
     await ev(`window.scrollTo(0, ${top}); 1`);
     const click = (label) => ev(`(() => { const b = [...document.querySelectorAll('button')].find(e => e.innerText.trim() === '${label}'); b && b.click(); return !!b; })()`);
     let followed = false, back = false;
-    await record("dashboard", 14, async (t) => {
+    await record("dashboard", 12.5, async (t) => {
       if (!followed && t >= 4.8) { followed = true; await click("Follow"); }
-      if (!back && t >= 7.3) { back = true; await click("Overview"); }
+      if (!back && t >= 9.8) { back = true; await click("Overview"); }
     }, []); /* no beat line: the workshop's own bottom line names each step, and a beat here would sit on the tab row */
   },
   /* /v2 with every close re-checked on chain in the browser: three held shots with hard cuts, one per ring card
@@ -159,24 +162,37 @@ const SEGMENTS = {
       let c = h; while (c && c.parentElement && !/rounded/.test(c.className || '')) c = c.parentElement;
       return Math.max(0, c.getBoundingClientRect().top + scrollY - 24); })()`);
     const shots = [
-      { y: 0, secs: 6.5, beats: [[0, "The live page reads the rings contract from testnet."], [2.8, "Every closed ring is re-checked on chain, in your browser."]] },
-      { y: await top("a44df021aa"), secs: 5.5, beats: [[0, "An ERC-7683 order, verified on chain and enforced by the contract."]] },
-      { y: await top("f5d3e16fca"), secs: 6, beats: [[0, "Three wallet standards, one settled ring, closed by k4."]] },
+      { y: 0, secs: 5, beats: [[0, "The live page reads the rings contract from testnet."], [2.4, "Every closed ring is re-checked on chain, in your browser."]] },
+      { y: await top("a44df021aa"), secs: 4.5, beats: [[0, "An ERC-7683 order, verified on chain and enforced by the contract."]] },
+      { y: await top("f5d3e16fca"), secs: 5, beats: [[0, "Three wallet standards, one settled ring, closed by k4."]] },
     ];
     const { writeFileSync, mkdtempSync } = await import("node:fs"); const os = await import("node:os");
-    const dir = mkdtempSync(join(os.tmpdir(), "v2shots-")); let list = ""; let k = 0;
-    for (const sh of shots) {
+    const dir = mkdtempSync(join(os.tmpdir(), "v2shots-")); let list = ""; let k = 0; const meta = [];
+    /* the green "Verified on chain" box nearest the middle of the viewport: the push-in target of the shot (0..1 of the frame) */
+    const focus = `(() => { const els = [...document.querySelectorAll('div,p')].filter(e => /^\\W*Verified on chain/.test((e.innerText || '').trim()) && e.children.length < 6);
+      let best = null, bd = 1e9; for (const e of els) { const r = e.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight || r.height > innerHeight / 2) continue;
+        const d = Math.abs(r.top + r.height / 2 - innerHeight / 2); if (d < bd) { bd = d; best = r; } }
+      return best ? [(best.left + best.width / 2) / innerWidth, (best.top + best.height / 2) / innerHeight] : [0.5, 0.5]; })()`;
+    for (const [si, sh] of shots.entries()) {
       await ev(`window.scrollTo(0, ${sh.y}); 1`);
       await send("Emulation.setDeviceMetricsOverride", { width: W, height: H + 40, deviceScaleFactor: DSF, mobile: false }); await sleep(400);
       await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: DSF, mobile: false }); await sleep(900);
+      const [cx, cy] = await ev(focus); let shotList = "";
       for (let b = 0; b < sh.beats.length; b++) {
         const [bt, line] = sh.beats[b], end = b + 1 < sh.beats.length ? sh.beats[b + 1][0] : sh.secs;
         await ev(overlayJs(line)); await sleep(250);
         const r = await send("Page.captureScreenshot", { format: "png" });
         const fn = join(dir, `${String(k++).padStart(3, "0")}.png`); writeFileSync(fn, Buffer.from(r.result.data, "base64"));
-        list += `file '${fn}'\nduration ${(end - bt).toFixed(3)}\n`;
+        list += `file '${fn}'\nduration ${(end - bt).toFixed(3)}\n`; shotList += `file '${fn}'\nduration ${(end - bt).toFixed(3)}\n`;
       }
+      shotList += shotList.split("\n").filter((l) => l.startsWith("file")).at(-1) + "\n";
+      writeFileSync(join(dir, `shot${si}.txt`), shotList);
+      const so = join(outDir, `web-v2-${si + 1}.mp4`);
+      await new Promise((r) => spawn(FFMPEG, ["-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", join(dir, `shot${si}.txt`),
+        "-vf", `scale=1920:1080:flags=lanczos,fps=${FPS}`, "-t", String(sh.secs), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16", "-r", String(FPS), so], { stdio: "inherit" }).on("close", r));
+      meta.push({ file: `web-v2-${si + 1}.mp4`, secs: sh.secs, cx: +cx.toFixed(4), cy: +cy.toFixed(4) });
     }
+    writeFileSync(join(outDir, "web-v2.json"), JSON.stringify(meta, null, 1));
     list += list.split("\n").filter((l) => l.startsWith("file")).at(-1) + "\n";
     writeFileSync(join(dir, "list.txt"), list);
     const out = join(outDir, "web-v2.mp4"), total = shots.reduce((a, s) => a + s.secs, 0);

@@ -32,7 +32,7 @@ registerScene({
   cap: { t: "Every ring here is on testnet.",
          s: "Each hash is a real transaction. Open any of them, or let the live page re-check them." },
   beats: [[0.5, "Three closes, three real transaction hashes."], [8.6, "Read from testnet when this video was rendered."],
-          [13.4, "Verify every ring at nomad-swarm.vercel.app/v2"]],
+          [13.4, "Verify every ring at nomad.charlesms.dev/v2"]],
   kicks: [[9.0, 0.3], [9.5, 0.25], [10.0, 0.25], [10.5, 0.25], [11.0, 0.25], [13.6, 0.35]],
   shots: [
     [0, 8.4, { p: [-5.4, 2.1, 10.4], l: [-5.4, 1.95, 0], fov: 34 }, { p: [-5.4, 2.1, 10.0], l: [-5.4, 1.95, 0], fov: 34 }, t => t],
@@ -114,7 +114,7 @@ registerScene({
     const url = new THREE.Group(); g.add(url); subject(url, "url plate");
     obox(url, 5.6, 0.7, 0.12, 0x0d1118, 0, 0, 0, { olT: 0.05 });
     obox(url, 5.66, 0.05, 0.14, ACCENT, 0, -0.37, 0, { ol: false });
-    const ut = label(url, [{ t: "nomad-swarm.vercel.app/v2", size: 0.3, weight: 700 }], { w: 5.4, h: 0.6, res: 220 }); ut.position.z = 0.07;
+    const ut = label(url, [{ t: "nomad.charlesms.dev/v2", size: 0.3, weight: 700 }], { w: 5.4, h: 0.6, res: 220 }); ut.position.z = 0.07;
 
     return { update(ph) {
       drawPaper(ph);
