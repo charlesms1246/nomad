@@ -278,6 +278,8 @@ function rig(s, ph) {
   if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
 }
 
+// ?nocap renders the scene without its title block and beat line (the video's cold open draws its own line).
+const NOCAP = /(^|[?&])nocap\b/.test(location.search);
 function captions(s, ph) {
   const c = s.cap || {};
   if (capT.textContent !== (c.t || "")) capT.textContent = c.t || "";
@@ -294,6 +296,7 @@ function captions(s, ph) {
   }
   if (beatSpan.textContent !== txt) beatSpan.textContent = txt;
   beatBox.style.opacity = txt ? a : 0;
+  if (NOCAP) { capBox.style.opacity = 0; beatBox.style.opacity = 0; }
 }
 
 let cur = -1;

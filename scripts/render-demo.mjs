@@ -35,7 +35,7 @@ const server = createServer(async (req, res) => {
   } catch { res.writeHead(404); res.end(); }
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
-const base = `http://127.0.0.1:${server.address().port}/index.html`;
+const base = `http://127.0.0.1:${server.address().port}/index.html${process.env.DECK_QUERY ? "?" + process.env.DECK_QUERY : ""}`;
 
 const port = 9400 + Math.floor(Math.random() * 400);
 const chrome = spawn(findChrome(), [`--remote-debugging-port=${port}`, "--use-angle=metal", "--hide-scrollbars",
